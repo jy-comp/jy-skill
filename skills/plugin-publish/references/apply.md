@@ -5,7 +5,7 @@
 > 若在点位配置阶段已执行 update，此步为兜底确认。
 
 ```bash
-npx @byted-meego/cli@builder update --source-type=local
+npx @byted-meego/cli@builder update --source-type=local 
 ```
 
 - 成功 → 继续 A2
@@ -14,7 +14,7 @@ npx @byted-meego/cli@builder update --source-type=local
 ## A2：构建 + 上传（release）
 
 ```bash
-npx @byted-meego/cli@builder release --source-type=local
+npx @byted-meego/cli@builder release
 ```
 
 **耗时操作**（约 30–120s），需展示构建进度。
@@ -24,10 +24,13 @@ npx @byted-meego/cli@builder release --source-type=local
 从 stdout 中提取产物版本号：
 
 ```
-The latest version number is 1 / 2 / 3
+Product version: 1
+(Use this as --product-version when running publish)
 ```
 
-正则提取：`/The latest version number is (\d+\.\d+\.\d+)/`
+正则提取：`/Product version: (\S+)/`
+
+> 注意：产物版本号是后端返回的内部版本（如 `1`、`2`、`3`），不是语义化版本号。直接作为 `--product-version` 传给 publish 即可。
 
 将提取到的版本号记为 `productVersion`，作为下一步 publish 的入参。
 
