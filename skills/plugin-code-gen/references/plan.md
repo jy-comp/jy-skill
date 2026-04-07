@@ -1,137 +1,28 @@
-# mode=plan：分析点位 + 规划代码骨架
+# mode=plan：分析需求 + 规划功能实现
 
-## P1：读取 plugin.config.json 中的 entry 信息
+> `npx @byted-meego/cli@builder update` 已在 setup 阶段生成了各点位的模板代码。
+> plan 阶段的目标是**规划用户真实需求的功能实现方案**，而非生成模板。
 
-从 `plugin.config.json` 的 `resources` 字段读取各点位的 entry 路径：
+## P1：读取已有模板代码
+
+从 `plugin.config.json` 的 `resources` 数组读取各点位的 entry 路径，然后**读取 entry 对应的模板代码文件**，了解 CLI 已生成的代码结构：
 
 ```json
-// 示例 resources 结构
 {
-  "board": [{ "key": "my_board", "entry": "src/features/board/my_board/index.tsx" }],
-  "dashboard": [{ "key": "my_tab", "entry": "src/features/dashboard/my_tab/index.tsx" }]
+  "resources": [
+    { "id": "board_web_rj4v_m", "entry": "./src/features/board_web_rj4v_m/index.tsx" }
+  ]
 }
 ```
 
-提取所有点位的 `key`、类型和 `entry` 路径。**entry 路径由 CLI update 生成，禁止自行修改。**
+读取每个 entry 文件的内容，确认模板的导出方式、初始化逻辑和可用的 JSSDK API。
 
-## P2：各点位类型代码骨架规范
+## P2：规划功能实现方案
 
-### 通用初始化模板（所有点位必须包含）
+结合用户的功能需求和已有的模板代码，规划具体的实现方案：
 
-```typescript
-import React from 'react';
-import { createRoot } from 'react-dom/client';
+1. 分析用户需求需要哪些 UI 组件、数据交互、状态管理
+2. 确认需要调用的 JSSDK API
+3. 规划代码修改方案——在模板基础上需要新增/修改哪些部分
 
-export default async function main() {
-  await window.JSSDK.shared.setSharedModules({ React, ReactDOM });
-  const container = document.createElement('div');
-  document.body.appendChild(container);
-  createRoot(container).render(<App />);
-}
-```
-
-### board（嵌入页面）
-
-```typescript
-// 全页面 React 应用，可调用 JSSDK 获取空间/工作项数据
-const App = () => {
-  const [data, setData] = React.useState(null);
-
-  React.useEffect(() => {
-    // 获取当前空间信息
-    window.JSSDK.shared.getProjectInfo().then(setData);
-  }, []);
-
-  return <div className="board-container">{/* 业务内容 */}</div>;
-};
-```
-
-### dashboard（详情 Tab）
-
-```typescript
-// 嵌入工作项详情页，接收 workItemId
-const App = () => {
-  const [workItem, setWorkItem] = React.useState(null);
-
-  React.useEffect(() => {
-    // 获取当前工作项详情
-    window.JSSDK.shared.getWorkItemDetail().then(setWorkItem);
-  }, []);
-
-  return <div className="dashboard-container">{/* 业务内容 */}</div>;
-};
-```
-
-### button（按钮，script 模式）
-
-```typescript
-// script 模式：执行操作后调用 trigger 通知
-export default async function main() {
-  // 获取当前上下文
-  const context = await window.JSSDK.shared.getContext();
-
-  // 执行业务逻辑...
-
-  // 操作完成通知
-  await window.JSSDK.shared.trigger({ success: true, message: '操作完成' });
-}
-```
-
-### control（表单控件）
-
-```typescript
-// 实现受控输入接口
-const App = () => {
-  const [value, setValue] = React.useState('');
-
-  const handleChange = (newValue: string) => {
-    setValue(newValue);
-    // 通知宿主值变更
-    window.JSSDK.shared.onChange(newValue);
-  };
-
-  return <input value={value} onChange={e => handleChange(e.target.value)} />;
-};
-```
-
-### config（插件配置页）
-
-```typescript
-// 插件配置界面，保存配置到插件存储
-const App = () => {
-  const handleSave = async (config: Record<string, any>) => {
-    await window.JSSDK.shared.saveConfig(config);
-  };
-
-  return <div>{/* 配置表单 */}</div>;
-};
-```
-
-### intercept（拦截器）
-
-```typescript
-// 服务端 webhook，不生成前端代码
-// 生成服务端处理函数模板（Node.js/TypeScript）
-export async function handler(req: Request, res: Response) {
-  const { event_type, work_item } = req.body;
-
-  // 拦截逻辑...
-
-  // 返回是否允许操作
-  res.json({ allow: true });
-}
-```
-
-## P3：规划文件清单
-
-根据 `plugin.config.json` 中各点位的 entry 路径，输出待生成的文件清单：
-
-```
-待生成文件（基于 plugin.config.json 中的 entry 路径）：
-  src/features/board/jira_board_main/index.tsx   （board 点位）
-  src/features/dashboard/detail_tab/index.tsx    （dashboard 点位）
-```
-
-> 注意：不需要更新 `plugin.config.json`，entry 路径已由 CLI update 生成。
-
-向用户确认后，进入 apply 阶段。
+向用户确认实现方案后，进入 apply 阶段。

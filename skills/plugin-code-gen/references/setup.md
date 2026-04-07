@@ -11,37 +11,20 @@ GET /sandbox/sessions/:session_id/status
 - 200 → 继续
 - 404 → 报错：`沙盒会话已过期`，终止
 
-### S2：plugin.config.json 中 resources entry 已生成
+### S2：点位配置已推送远端
+> **关键前置条件**：代码生成必须基于已推送到远端的点位配置，不能仅依赖本地文件。
+从远端拉取当前配置并确认：
 
-读取 `plugin.config.json` 的 `resources` 字段，确认：
-- 至少有 1 个点位类型的 entry 配置
-- 每个点位的 `key` 和 `entry` 路径均已填写
-
-若 resources 为空或无 entry → 提示：`请先完成点位配置并执行 update（meego-point-config skill）`
-
-### S3：plugin.config.json 中 pluginId 已填写
-
-```
-GET /sandbox/sessions/:id/files?path=plugin.config.json
-```
-
-确认 `pluginId` 非空。若为空 → 提示先完成 `plugin-create` skill。
-
-### S4：工程模板已拉取
-
-在沙盒中执行：
 ```bash
-ls src/ && ls node_modules/
+npx @byted-meego/cli@builder update
 ```
-
-两个目录均存在 → 继续
-任一不存在 → 提示先执行 `plugin-create mode=apply`
+并确认：
+- 至少有 1 个点位类型的 entry 配置
+- 每个点位的 `id` 和 `entry` 路径均已填写
 
 ## 输出
 
 ```
 ✅ 沙盒 Session 存活
 ✅ 点位配置就绪（N 个点位，类型：board/dashboard/...）
-✅ pluginId 已填写
-✅ 工程模板就绪（src/ + node_modules/ 存在）
 ```
