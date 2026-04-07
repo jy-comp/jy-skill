@@ -51,12 +51,12 @@ npx @byted-meego/cli@builder update
 - 成功 → 继续执行清理
 - 失败 → 报错展示，但不影响已推送的远端配置
 
-## A4：清理临时文件
+## A4：清理临时文件（强制）
 
-```
-删除 point-schema.yaml
-删除 point.config.local-remote.json
-删除 point.config.local-{timestamp}.json
+> **MUST — 此步骤不可跳过。** apply 完成后 `point.config.local-{timestamp}.json` 已无任何下游消费者，必须立即删除。如果文件不存在则跳过，不报错。
+
+```bash
+rm -f point.config.local-*.json
 ```
 
 ## A5：输出

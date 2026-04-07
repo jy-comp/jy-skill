@@ -91,7 +91,7 @@ mode=pipeline（默认）→ setup → plan → apply → verify
 verify 通过后，引导用户启动本地开发服务器进行调试：
 
 ```bash
-npx @byted-meego/cli@builder start --source_type local --auto
+npx @byted-meego/cli@builder start --auto
 ```
 
 `--auto` 参数会自动根据 `getLocalConfig` 中的当前域名拼接调试 URL，并在浏览器中打开。
@@ -100,6 +100,6 @@ npx @byted-meego/cli@builder start --source_type local --auto
 ✅ 代码生成完成，语法检查通过
 
 下一步：启动本地调试
-  运行：npx @byted-meego/cli@builder start --source_type local --auto
+  运行：npx @byted-meego/cli@builder start --auto
   CLI 将自动打开浏览器调试页面
 ```

@@ -82,9 +82,11 @@ mode=pipeline（默认）→ setup → plan → apply → verify
 
 | 文件 | 说明 |
 |------|------|
-| `point-schema.yaml` | npx @byted-meego/cli@builder schema 输出，plan 阶段生成，verify 后删除 |
-| `point.config.local-remote.json` | 当前远端配置（local 格式），plan 阶段生成，verify 后删除 |
-| `point.config.local-{timestamp}.json` | 本次生成的配置，apply 后删除 |
+| `point-schema.yaml` | plan 阶段生成，**verify 后必须删除（强制）** |
+| `point.config.local-remote.json` | 当前远端配置（local 格式），plan 阶段生成，**verify 后必须删除（强制）** |
+| `point.config.local-{timestamp}.json` | 本次生成的配置，**apply 后必须删除（强制）** |
+
+> **临时文件清理是强制步骤，不可跳过。** 每个临时文件在其最后消费步骤完成后必须立即删除。
 
 ## 全量提交约束
 

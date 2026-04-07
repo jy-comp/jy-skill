@@ -41,7 +41,7 @@ plugin-workflow（顶层编排）
 | `env-setup` | 环境检查 + Device Code OAuth 授权 | `npx @byted-meego/cli@builder --version` / `login --site-domain` |
 | `plugin-create` | 最小化创建插件工程骨架 | `npx @byted-meego/cli@builder create` |
 | `meego-point-config` | 点位配置全量增删改 | `local-config set` + `update --source-type=local` |
-| `plugin-code-gen` | AI 生成各点位代码 + 引导本地调试 | AI 直接生成 + `npx @byted-meego/cli@builder start --source_type local --auto` |
+| `plugin-code-gen` | AI 生成各点位代码 + 引导本地调试 | AI 直接生成 + `npx @byted-meego/cli@builder start --auto` |
 | `plugin-polish` | 发布前 AI 总结生成名称/描述/分类 | `npx @byted-meego/cli@builder update-description` + `list-categories` |
 | `plugin-publish` | 同步配置 + 构建上传 + 版本发布 | `update` + `release` + `publish` |
 
