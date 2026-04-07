@@ -68,7 +68,16 @@ npx @byted-meego/cli@builder local-config get > point.config.local-remote.json
 - [ ] name 长度在限制内
 - [ ] 是否为全量配置（非仅变更部分）
 
-## P5：输出
+## P5：清理临时文件（强制）
+
+> **MUST — 此步骤不可跳过。** `point.config.local-remote.json` 仅在 plan 阶段使用，生成配置文件后立即删除。
+> `point-schema.yaml` 在后续 polish 阶段仍需参考，此处保留，发布完成后由 plugin-publish 统一清理。
+
+```bash
+rm -f point.config.local-remote.json
+```
+
+## P6：输出
 
 plan 阶段完成后输出：
 - 生成的配置文件路径：`point.config.local-{timestamp}.json`

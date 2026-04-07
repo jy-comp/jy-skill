@@ -31,7 +31,7 @@
 npx @byted-meego/cli@builder list-categories
 ```
 
-输出为 JSON 数组，每项包含 `id`、`name`（多语言 map）。
+输出为 JSON 数组，每项包含 `id`、`name`, 对照name字段，传入分类的id。
 
 **AI 根据功能摘要推荐 1-3 个最匹配的分类。** 推荐依据：
 - 点位类型（dashboard 类 → 数据分析，button/intercept 类 → 流程管理...）

@@ -99,7 +99,15 @@ Plugin share url: https://meego.example.com/openapp/plugin_share?appKey=PL_xxx
 | 版本号已存在 | 自动 patch +1 重试，或提示用户指定版本号 |
 | 网络/权限错误 | 展示原始错误，告知用户可手动重试 |
 
-## A4：输出
+## A4：清理临时文件（强制）
+
+> **MUST — 此步骤不可跳过。** 发布完成后 `point-schema.yaml` 已无任何下游消费者，必须立即删除。
+
+```bash
+rm -f point-schema.yaml
+```
+
+## A5：输出
 
 ```
 ✅ 插件发布完成
