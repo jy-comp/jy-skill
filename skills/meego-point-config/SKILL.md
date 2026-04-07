@@ -92,5 +92,6 @@ mode=pipeline（默认）→ setup → plan → apply → verify
 1. 先 `local-config get` 获取完整配置
 2. 在完整配置基础上做局部增删改
 3. 将修改后的完整配置提交
+4. 推送成功后执行 `npx @byted-meego/cli@builder update` 将远端配置同步回本地
 
-禁止只传变更部分。
+禁止只传变更部分。**禁止直接修改 `plugin.config.json`**，始终通过 CLI 命令同步。

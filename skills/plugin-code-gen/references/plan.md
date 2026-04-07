@@ -1,14 +1,18 @@
 # mode=plan：分析点位 + 规划代码骨架
 
-## P1：读取点位配置
+## P1：读取 plugin.config.json 中的 entry 信息
 
-从沙盒读取当前点位配置，提取所有点位的 `key` 和类型：
+从 `plugin.config.json` 的 `resources` 字段读取各点位的 entry 路径：
 
+```json
+// 示例 resources 结构
+{
+  "board": [{ "key": "my_board", "entry": "src/features/board/my_board/index.tsx" }],
+  "dashboard": [{ "key": "my_tab", "entry": "src/features/dashboard/my_tab/index.tsx" }]
+}
 ```
-GET /sandbox/sessions/:id/files?path=point.config.local-remote.json
-```
 
-或从对话上下文中获取已确认的点位列表。
+提取所有点位的 `key`、类型和 `entry` 路径。**entry 路径由 CLI update 生成，禁止自行修改。**
 
 ## P2：各点位类型代码骨架规范
 
@@ -120,13 +124,14 @@ export async function handler(req: Request, res: Response) {
 
 ## P3：规划文件清单
 
-根据点位列表，输出待生成的文件清单：
+根据 `plugin.config.json` 中各点位的 entry 路径，输出待生成的文件清单：
 
 ```
-待生成文件：
+待生成文件（基于 plugin.config.json 中的 entry 路径）：
   src/features/board/jira_board_main/index.tsx   （board 点位）
   src/features/dashboard/detail_tab/index.tsx    （dashboard 点位）
-  plugin.config.json（更新 resources 字段）
 ```
+
+> 注意：不需要更新 `plugin.config.json`，entry 路径已由 CLI update 生成。
 
 向用户确认后，进入 apply 阶段。

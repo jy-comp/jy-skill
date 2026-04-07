@@ -21,7 +21,7 @@ metadata:
 ```
 mode=setup   → 检查点位配置已完成 + 沙盒工程目录就绪
 mode=plan    → AI 分析点位列表，规划各点位的代码骨架
-mode=apply   → AI 生成代码文件 → 写入沙盒 → 更新 plugin.config.json resources
+mode=apply   → AI 基于 entry 路径生成代码文件 → 写入对应路径
 mode=verify  → tsc --noEmit 语法预检；如有错误最多自动修复 2 轮
 mode=pipeline（默认）→ setup → plan → apply → verify
 ```
@@ -30,15 +30,15 @@ mode=pipeline（默认）→ setup → plan → apply → verify
 
 **无 CLI，AI 直接生成**：本 skill 不调用任何 npx @byted-meego/cli@builder 命令来生成代码，完全由 AI 根据点位类型和 JSSDK 规范生成 TypeScript/React 代码。
 
-## resourceId 规则（关键）
+## entry 驱动的代码生成（关键）
 
-resourceId 是代码文件路径和点位配置的连接键，三处必须严格对应：
+**代码生成必须基于 `plugin.config.json` 中已有的 `resources` entry 路径来创建文件。**
 
-```
-点位配置中:  { "key": "jira_board_main", "name": "Jira 看板" }
-代码文件路径: src/features/board/jira_board_main/index.tsx
-plugin.config.json resources 字段:
-  {
+在 meego-point-config 的 apply 阶段执行 `npx @byted-meego/cli@builder update` 后，CLI 会自动在 `plugin.config.json` 的 `resources` 字段中生成各点位的 entry 信息，例如：
+
+```json
+{
+  "resources": {
     "board": [
       {
         "key": "jira_board_main",
@@ -46,11 +46,15 @@ plugin.config.json resources 字段:
       }
     ]
   }
+}
 ```
 
-- resourceId = 点位配置中的 `key` 字段（由 meego-point-config skill 生成）
-- 文件路径模板：`src/features/{pointType}/{resourceId}/index.tsx`
-- `plugin.config.json` 的 `resources` 字段在代码生成后同步更新
+代码生成流程：
+1. **读取** `plugin.config.json` 中 `resources` 各点位的 `entry` 路径
+2. **按 entry 路径创建对应的代码文件**
+3. **禁止自行拼接文件路径**，禁止修改 `plugin.config.json` 中已有的 entry 信息
+
+entry 是 CLI 生成的唯一真实来源，代码生成只负责在 entry 指定的路径下创建代码文件。
 
 ## 代码骨架规范
 
@@ -76,8 +80,7 @@ plugin.config.json resources 字段:
 
 | 产物 | 说明 |
 |------|------|
-| `src/features/{type}/{key}/index.tsx` | 各点位对应的 React 代码文件 |
-| `plugin.config.json`（更新）| resources 字段更新为各点位的 entry 映射 |
+| entry 路径对应的代码文件 | 基于 `plugin.config.json` resources 中的 entry 路径创建 |
 | `project.zip`（按需）| 整个工程打包，供用户下载本地调试 |
 
 ## 代码质量保障分层策略
@@ -93,7 +96,7 @@ plugin.config.json resources 字段:
 verify 通过后，引导用户启动本地开发服务器进行调试：
 
 ```bash
-npx @byted-meego/cli@builder start --auto
+npx @byted-meego/cli@builder start --source_type local --auto
 ```
 
 `--auto` 参数会自动根据 `getLocalConfig` 中的当前域名拼接调试 URL，并在浏览器中打开。
@@ -102,6 +105,6 @@ npx @byted-meego/cli@builder start --auto
 ✅ 代码生成完成，语法检查通过
 
 下一步：启动本地调试
-  运行：npx @byted-meego/cli@builder start --auto
+  运行：npx @byted-meego/cli@builder start --source_type local --auto
   CLI 将自动打开浏览器调试页面
 ```

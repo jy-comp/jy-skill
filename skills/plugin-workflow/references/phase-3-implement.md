@@ -22,7 +22,7 @@ AI 根据点位类型和用户的功能需求生成对应的 React 代码。code
 ✅ 代码生成完成
 
 现在启动本地调试看看效果：
-  运行：npx @byted-meego/cli@builder start --auto
+  运行：npx @byted-meego/cli@builder start --source_type local --auto
 
 CLI 将自动打开浏览器调试页面，检查功能是否符合预期。
 ```

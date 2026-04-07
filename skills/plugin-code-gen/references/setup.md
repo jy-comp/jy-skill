@@ -11,13 +11,13 @@ GET /sandbox/sessions/:session_id/status
 - 200 → 继续
 - 404 → 报错：`沙盒会话已过期`，终止
 
-### S2：点位配置已完成
+### S2：plugin.config.json 中 resources entry 已生成
 
-读取沙盒中的 `point.config.local-remote.json`（或当前 apply 生成的配置），确认：
-- 至少有 1 个点位类型的配置
-- 每个点位的 `key` 字段均已填写
+读取 `plugin.config.json` 的 `resources` 字段，确认：
+- 至少有 1 个点位类型的 entry 配置
+- 每个点位的 `key` 和 `entry` 路径均已填写
 
-若点位配置为空 → 提示：`请先完成点位配置（meego-point-config skill）`
+若 resources 为空或无 entry → 提示：`请先完成点位配置并执行 update（meego-point-config skill）`
 
 ### S3：plugin.config.json 中 pluginId 已填写
 

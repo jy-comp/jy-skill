@@ -61,7 +61,7 @@ npx tsc --noEmit
 verify 通过（L1 或 L2 修复后通过）后，引导用户启动调试：
 
 ```bash
-npx @byted-meego/cli@builder start --auto
+npx @byted-meego/cli@builder start --source_type local --auto
 ```
 
 `--auto` 参数会自动根据 `getLocalConfig` 中的当前域名拼接调试 URL，并在浏览器中打开调试页面。
@@ -70,7 +70,7 @@ npx @byted-meego/cli@builder start --auto
 ✅ TypeScript 语法检查通过，代码质量合格
 
 下一步：启动本地调试服务器
-  运行：npx @byted-meego/cli@builder start --auto
+  运行：npx @byted-meego/cli@builder start --source_type local --auto
   CLI 将自动打开浏览器调试页面
 ```
 

@@ -35,10 +35,23 @@ npx @byted-meego/cli@builder local-config set --config '<point.config.local-{tim
 npx @byted-meego/cli@builder update --source-type=local
 ```
 
-- 成功 → 打印成功信息，继续执行清理
-- 失败 → 报错展示，终止（不继续 verify）
+- 成功 → 继续执行 A3
+- 失败 → 报错展示，终止（不继续后续步骤）
 
-## A3：清理临时文件
+## A3：拉取远端配置到本地（update）
+
+推送成功后，**必须**再执行一次 update 将远端配置（含模板等）同步回本地 `plugin.config.json`：
+
+```bash
+npx @byted-meego/cli@builder update
+```
+
+> **禁止直接修改 `plugin.config.json`。** 始终通过 `update` 命令让 CLI 自动同步，确保本地配置与远端一致。
+
+- 成功 → 继续执行清理
+- 失败 → 报错展示，但不影响已推送的远端配置
+
+## A4：清理临时文件
 
 ```
 删除 point-schema.yaml
@@ -46,7 +59,7 @@ npx @byted-meego/cli@builder update --source-type=local
 删除 point.config.local-{timestamp}.json
 ```
 
-## A4：输出
+## A5：输出
 
 ```
 ✅ 配置已成功推送至远端
