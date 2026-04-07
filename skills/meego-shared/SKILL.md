@@ -73,6 +73,8 @@ Token 按域名存储在 `~/.lpm/auth.json`，格式：
 
 **方式 A（推荐）：直接设置永久 Developer Token**
 
+引导用户前往 `<站点域名>/openapp/settings` 页面复制 Developer Token，然后执行：
+
 ```bash
 npx @byted-meego/cli@builder login --site-domain <域名> --token <developer_token>
 ```

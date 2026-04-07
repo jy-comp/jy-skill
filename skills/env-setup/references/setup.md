@@ -35,19 +35,29 @@ B. 浏览器授权登录 — 通过 Device Code 流程，在浏览器中完成 O
 
 #### 方式 A：直接提供 Developer Token（推荐）
 
-1. 用户提供 developer token
-2. 确定站点域名（Meego 站点域名，如 `https://meego.example.com`）
+1. 确定站点域名（`$host`）：
    - 若当前目录有 `plugin.config.json`，从中读取 `siteDomain` 作为默认值
-3. 执行：
+   - 否则询问用户（同方式 B 的域名确定逻辑）
+2. 引导用户获取 Developer Token：
+
+```
+请打开以下页面获取 Developer Token：
+
+🔗 $host/openapp/settings
+
+在页面中找到并复制你的 Developer Token，然后粘贴给我。
+```
+
+3. 用户提供 token 后执行：
 
 ```bash
-npx @byted-meego/cli@builder login --site-domain <域名> --token <developer_token>
+npx @byted-meego/cli@builder login --site-domain $host --token <developer_token>
 ```
 
 4. 输出：
 
 ```
-✅ Developer Token 已保存至 ~/.lpm/auth.json（域名：<域名>）
+✅ Developer Token 已保存至 ~/.lpm/auth.json（域名：$host）
 ```
 
 > 永久有效，无需刷新。后续该域名下的所有操作将优先使用此 Token。
