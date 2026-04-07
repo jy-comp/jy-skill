@@ -35,7 +35,7 @@ npx @byted-meego/cli@builder local-config get > point.config.local-remote.json
 | button | key、name（≤15字符）、work_item_type、platform.web.mode（ui/script） |
 | intercept | key、name（≤15字符）、url、token、event_config（至少1条，需确认 work_item_type 和 event_type 数字编号） |
 | listen_event | url、token、event_config（同上） |
-| component | key（component_type 固定为 schedule，不询问） |
+| component | key、component_type（以 schema 枚举为准，目前支持轻应用） |
 | field_template | key、i18n_info.name（≤50字符）、i18n_info.description、subfield（至少1条：name/field_type枚举/field_key）、platform.web.resource、platform.mobile.resource、platform.mobile.mobile_block_style |
 | builder_comp | key、icon_url、i18n_info（多语言）、properties（至少1条）、platform.web.resource、platform.web.layout.mode（0/1） |
 

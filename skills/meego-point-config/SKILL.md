@@ -39,7 +39,7 @@ mode=pipeline（默认）→ setup → plan → apply → verify
 | `button` | key, name(max 15字符), work_item_type |
 | `intercept` | key, name(max 15字符), url, token, event_config(min 1条) |
 | `listen_event` | url, token, event_config(min 1条)；key 可选 |
-| `component` | key, component_type(固定为 schedule) |
+| `component` | key, component_type（以 schema 为准，目前支持轻应用） |
 | `field_template` | key, i18n_info, subfield(min 1条), platform |
 | `builder_comp` | key, icon_url, i18n_info, properties, platform |
 
