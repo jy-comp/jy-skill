@@ -100,6 +100,7 @@ Token 按域名生效，确定 `siteDomain` 的优先级：
 
 ## 安全规则
 
+- **禁止修改 `.lpm/` 目录下的任何文件**：`.lpm/` 目录由 CLI 内部管理（如 `auth.json`、缓存等），禁止通过 Edit/Write 工具或任何方式直接修改其中的文件，只能通过 CLI 命令间接操作
 - **禁止输出密钥**（accessToken、pluginSecret）到终端明文
 - **写入/删除操作前必须确认用户意图**（如发布、删除点位等不可逆操作）
 - **全量提交约束**：`local-config set` 和 `update --source-type=local` 均为全量操作，禁止只传变更部分
