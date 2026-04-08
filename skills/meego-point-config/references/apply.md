@@ -2,13 +2,13 @@
 
 ## 前置
 
-- 需要 plan 阶段生成的 `point.config.local-{timestamp}.json`
+- 需要 plan 阶段生成的 `plugin.temp.local-{timestamp}.json`
 - 若无该文件，先执行 `mode=plan`
 
 ## A1：Schema 校验（local-config set）
 
 ```bash
-npx @byted-meego/cli@builder local-config set --config '<point.config.local-{timestamp}.json 的完整 JSON 内容>'
+npx @byted-meego/cli@builder local-config set --config '<plugin.temp.local-{timestamp}.json 的完整 JSON 内容>'
 ```
 
 > `--config` 参数值是完整 JSON 字符串，不是文件路径。
@@ -53,10 +53,10 @@ npx @byted-meego/cli@builder update
 
 ## A4：清理临时文件（强制）
 
-> **MUST — 此步骤不可跳过。** apply 完成后 `point.config.local-{timestamp}.json` 已无任何下游消费者，必须立即删除。如果文件不存在则跳过，不报错。
+> **MUST — 此步骤不可跳过。** apply 完成后 `plugin.temp.local-{timestamp}.json` 已无任何下游消费者，必须立即删除。如果文件不存在则跳过，不报错。
 
 ```bash
-rm -f point.config.local-*.json
+rm -f plugin.temp.local-*.json
 ```
 
 ## A5：输出

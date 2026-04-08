@@ -4,7 +4,7 @@
 
 ```bash
 npx @byted-meego/cli@builder schema > point-schema.yaml
-npx @byted-meego/cli@builder local-config get > point.config.local-remote.json
+npx @byted-meego/cli@builder local-config get > plugin.temp.local-remote.json
 ```
 
 - 若 `local-config get` 返回空，以 `{}` 作为基础
@@ -41,24 +41,24 @@ npx @byted-meego/cli@builder local-config get > point.config.local-remote.json
 
 ### 对于删除操作
 
-1. 从 `point.config.local-remote.json` 中列出匹配的候选点位
+1. 从 `plugin.temp.local-remote.json` 中列出匹配的候选点位
 2. 展示候选列表，让用户确认要删除哪个
 3. **二次确认删除**，展示点位详情后请求确认
 
 ### 对于修改操作
 
-1. 从 `point.config.local-remote.json` 找到目标点位
+1. 从 `plugin.temp.local-remote.json` 找到目标点位
 2. 仅询问需要修改的字段
 3. 其余字段保持原值
 
 ## P4：生成完整配置文件
 
-基于 `point.config.local-remote.json` 的全量配置：
+基于 `plugin.temp.local-remote.json` 的全量配置：
 - **添加**：在对应类型数组中 append 新点位对象
 - **修改**：找到匹配 key 的点位，合并更新字段
 - **删除**：从对应类型数组中移除匹配 key 的点位
 
-生成文件名：`point.config.local-{YYYY-MM-DD_HHmmss}.json`
+生成文件名：`plugin.temp.local-{YYYY-MM-DD_HHmmss}.json`
 
 ### 生成前自检
 
@@ -70,15 +70,15 @@ npx @byted-meego/cli@builder local-config get > point.config.local-remote.json
 
 ## P5：清理临时文件（强制）
 
-> **MUST — 此步骤不可跳过。** `point.config.local-remote.json` 仅在 plan 阶段使用，生成配置文件后立即删除。
+> **MUST — 此步骤不可跳过。** `plugin.temp.local-remote.json` 仅在 plan 阶段使用，生成配置文件后立即删除。
 > `point-schema.yaml` 在后续 polish 阶段仍需参考，此处保留，发布完成后由 plugin-publish 统一清理。
 
 ```bash
-rm -f point.config.local-remote.json
+rm -f plugin.temp.local-remote.json
 ```
 
 ## P6：输出
 
 plan 阶段完成后输出：
-- 生成的配置文件路径：`point.config.local-{timestamp}.json`
+- 生成的配置文件路径：`plugin.temp.local-{timestamp}.json`
 - 变更摘要：添加/修改/删除了哪些点位（类型 + key）

@@ -84,8 +84,8 @@ mode=pipeline（默认）→ setup → plan → apply → verify
 | 文件 | 说明 |
 |------|------|
 | `point-schema.yaml` | plan 阶段生成，polish 阶段仍需参考，**发布完成后由 plugin-publish 删除** |
-| `point.config.local-remote.json` | 当前远端配置（local 格式），**plan 完成后必须删除** |
-| `point.config.local-{timestamp}.json` | 本次生成的配置，**apply 完成后必须删除** |
+| `plugin.temp.local-remote.json` | 当前远端配置（local 格式），**plan 完成后必须删除** |
+| `plugin.temp.local-{timestamp}.json` | 本次生成的配置，**apply 完成后必须删除** |
 
 ## 全量提交约束
 

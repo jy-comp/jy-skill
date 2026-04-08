@@ -15,7 +15,7 @@
 - **描述**（i18n_info 中的 description）
 - **适用的工作项类型**
 
-> **注意：** 不要依赖 `point-schema.yaml` 或 `point.config.local-remote.json`，这些临时文件在 point-config 流程结束后已被删除。`plugin.config.json` 经过 `update` 同步后已包含完整的远端配置。
+> **注意：** 不要依赖 `point-schema.yaml` 或 `plugin.temp.local-remote.json`，这些临时文件在 point-config 流程结束后已被删除。`plugin.config.json` 经过 `update` 同步后已包含完整的远端配置。
 
 ## A3：快速浏览代码
 
