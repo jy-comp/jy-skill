@@ -53,20 +53,57 @@ npx @byted-meego/cli@builder local-config get > plugin.temp.local-remote.json
 
 ## P4：生成完整配置文件
 
+**⚠️ 核心原则：set 是全量替换，必须基于远端完整数据操作。**
+
 基于 `plugin.temp.local-remote.json` 的全量配置：
-- **添加**：在对应类型数组中 append 新点位对象
-- **修改**：找到匹配 key 的点位，合并更新字段
-- **删除**：从对应类型数组中移除匹配 key 的点位
+
+### 添加操作
+
+在对应类型数组中 append 新点位对象，**保留所有其他类型和其他点位不变**。
+
+```
+远端: { "board": [A], "button": [B1, B2] }
+用户: 新增一个 builder_comp
+结果: { "board": [A], "button": [B1, B2], "builder_comp": [新点位] }
+```
+
+对于 Single 类型（board/view/dashboard/config/intercept/listen_event/component），如果远端已有该类型的点位，**不能再添加**（maxItems=1）。应提示用户是要替换还是修改现有点位。
+
+### 修改操作
+
+找到匹配 key 的点位，合并更新字段，**其余字段和其他点位原样保留**。
+
+```
+远端: { "button": [{ "key": "button_x1", "name": "旧名" }, { "key": "button_x2", ... }] }
+用户: 把 button_x1 的名字改成"新名"
+结果: { "button": [{ "key": "button_x1", "name": "新名" }, { "key": "button_x2", 原样 }] }
+```
+
+### 删除操作
+
+从对应类型数组中移除匹配 key 的点位，**其余原样保留**。
+
+```
+远端: { "board": [A], "button": [B1, B2] }
+用户: 删除 B2
+结果: { "board": [A], "button": [B1] }
+
+用户: 删除整个 button 类型的所有点位
+结果: { "board": [A] }
+```
+
+**⚠️ 如果只传 `{ "builder_comp": [新点位] }` 而不包含 board 和 button，远端的 board 和 button 将被清除！**
 
 生成文件名：`plugin.temp.local-{YYYY-MM-DD_HHmmss}.json`
 
 ### 生成前自检
 
+- [ ] 是否为**全量配置**（包含远端所有现有类型+本次变更，非仅变更部分）
 - [ ] key 在同类型中唯一（不与现有点位冲突）
+- [ ] Single 类型未超过 maxItems=1
 - [ ] 必填字段均已填写
 - [ ] 枚举值合法（mode、mobile_block_style、field_type、view.icon）
 - [ ] name 长度在限制内
-- [ ] 是否为全量配置（非仅变更部分）
 
 ## P5：清理临时文件（强制）
 

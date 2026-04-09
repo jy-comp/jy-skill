@@ -87,12 +87,30 @@ mode=pipeline（默认）→ setup → plan → apply → verify
 | `plugin.temp.local-remote.json` | 当前远端配置（local 格式），**plan 完成后必须删除** |
 | `plugin.temp.local-{timestamp}.json` | 本次生成的配置，**apply 完成后必须删除** |
 
-## 全量提交约束
+## 全量提交约束（核心机制）
 
-`local-config set` 和 `update --source-type=local` 均为**全量操作**。必须：
-1. 先 `local-config get` 获取完整配置
-2. 在完整配置基础上做局部增删改
-3. 将修改后的完整配置提交
+`local-config set` 和 `update --source-type=local` 均为**全量替换**——提交什么就存什么，远端不做合并。
+
+**必须遵循的操作流程：**
+1. 先 `local-config get` 获取远端**完整配置**作为基础
+2. 在完整配置基础上做**局部增删改**
+3. 将修改后的**完整配置**提交（包含所有点位类型、所有点位实例）
 4. 推送成功后执行 `npx @byted-meego/cli@builder update` 将远端配置同步回本地
 
-禁止只传变更部分。**禁止直接修改 `plugin.config.json`**，始终通过 CLI 命令同步。
+**严禁以下行为：**
+- 只传变更部分（会导致未传的点位被删除）
+- 直接修改 `plugin.config.json`（始终通过 CLI 命令同步）
+
+### 增/改/删操作模式
+
+假设远端当前配置为：
+```json
+{ "board": [{ "key": "board_abc123", ... }], "button": [{ "key": "button_x1", ... }, { "key": "button_x2", ... }] }
+```
+
+| 操作 | set 的 JSON 内容 | 说明 |
+|------|-----------------|------|
+| **新增** builder_comp | `{ "board": [原样保留], "button": [原样保留], "builder_comp": [新点位] }` | 必须带上 board 和 button，否则它们会被删除 |
+| **修改** button_x1 的 name | `{ "board": [原样保留], "button": [{ "key": "button_x1", name已改, ... }, { "key": "button_x2", 原样 }] }` | 只改目标字段，其余字段和其他点位原样保留 |
+| **删除** button_x2 | `{ "board": [原样保留], "button": [{ "key": "button_x1", 原样 }] }` | 从数组中移除目标项，其余原样保留 |
+| **删除整个** button 类型 | `{ "board": [原样保留] }` | 不传 button 字段，远端 button 即被清除 |
