@@ -1,6 +1,14 @@
 # mode=verify：TypeScript 语法预检 + 自动修复
 
+**Checkpoint 恢复检查**（仅在 `.plugin-workflow-state.json` 存在时）：
+- `lastCommand` 含 `tsc` + `"success"` → 语法已通过，跳到 V4 引导调试
+- `lastCommand` 含 `tsc` + `"failed"` + `context.tscRound=1` → 从第 2 轮修复继续
+- `lastCommand` 含 `tsc` + `"failed"` + `context.tscRound=2` → 进入 V3 降级兜底
+- 其他 → 从 V1 开始
+
 ## V1：执行 tsc --noEmit 预检（L1）
+
+**Checkpoint**：执行前写入 `{ nextCommand: "tsc --noEmit", nextStep: "V1 语法预检", lastCommandStatus: "running", context: { ..., tscRound: 0 } }`
 
 在沙盒中执行：
 ```bash
@@ -11,6 +19,8 @@ npx tsc --noEmit
 
 ### 成功（exit code 0）
 
+**Checkpoint**：`{ lastCommand: "tsc --noEmit", lastCommandStatus: "success", nextStep: "V4 引导调试" }`
+
 ```
 ✅ TypeScript 语法检查通过，代码质量 L1 合格
    下一步：执行 plugin-publish skill 发布版本
@@ -18,22 +28,28 @@ npx tsc --noEmit
 
 ### 失败（有语法错误）→ 进入 L2 自动修复
 
+**Checkpoint**：`{ lastCommand: "tsc --noEmit", lastCommandStatus: "failed", context: { ..., tscRound: 0 } }`
+
 ## V2：AI 自动修复（L2，最多 2 轮）
 
 **第 1 轮修复**：
+
+**Checkpoint**：修复代码后、重新 tsc 前写入 `{ nextCommand: "tsc --noEmit", nextStep: "V2 第 1 轮修复后重检", lastCommandStatus: "running", context: { ..., tscRound: 1 } }`
 
 1. 读取 tsc 完整错误输出（文件名 + 行号 + 错误类型）
 2. AI 分析错误原因（import 路径错误、类型不匹配等）
 3. 生成修复后的代码，通过 `/files` 接口覆盖写入
 4. 重新执行 `tsc --noEmit`
 
-若第 1 轮成功 → 通过，继续发布。
+若第 1 轮成功 → **Checkpoint**：`{ lastCommand: "tsc --noEmit", lastCommandStatus: "success", context: { ..., tscRound: 1 } }` → 通过，继续发布。
 
 **第 2 轮修复**：
 
+**Checkpoint**：`{ nextCommand: "tsc --noEmit", nextStep: "V2 第 2 轮修复后重检", lastCommandStatus: "running", context: { ..., tscRound: 2 } }`
+
 若第 1 轮仍失败，再尝试一次（方法同上）。
 
-若第 2 轮成功 → 通过，继续发布。
+若第 2 轮成功 → **Checkpoint**：`{ lastCommand: "tsc --noEmit", lastCommandStatus: "success", context: { ..., tscRound: 2 } }` → 通过，继续发布。
 
 ## V3：降级兜底（L3）
 

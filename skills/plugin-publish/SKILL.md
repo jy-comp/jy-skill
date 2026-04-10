@@ -2,8 +2,8 @@
 name: plugin-publish
 version: 1.0.0
 description: |
-  Meego 插件完整发布流程（内部 skill）：同步配置到后台 + 构建上传产物 + 版本发布 + 输出分享链接。
-  当用户在已有插件工程中明确说"发布插件"、"上传版本"、"release"、"publish"时触发，或由 plugin-workflow 内部调用。
+  Meego 插件完整发布流程（编排 skill）：同步配置到后台 + 构建上传产物 + 版本发布 + 输出分享链接。
+  当用户在插件工程中说"发布插件"、"上线"、"部署"、"release"、"publish"时触发，或由 plugin-workflow 内部调用。
   前提：plugin-polish skill 已执行（插件名称/描述/分类已填充），代码文件已就绪，plugin.config.json resources 已更新。
 metadata:
   requires:

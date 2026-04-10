@@ -2,9 +2,13 @@
 
 将 Phase 1 确认的需求转化为可运行的插件工程骨架。本阶段串联环境准备、创建工程、拉取 schema 分析点位、配置点位四个步骤。
 
+> **Checkpoint**：本阶段每个子步骤执行前后都需要更新 `.plugin-workflow-state.json`，详见 SKILL.md「进度追踪」章节。
+
 ## 2.1 环境准备 → env-setup
 
 检查开发环境是否就绪：
+
+**Checkpoint 写入**：`{ "phase": 2, "step": "2.1", "stepName": "env-setup", "nextCommand": "npx @byted-meego/cli@builder login ...", "nextStep": "2.1 环境准备" }`
 
 ```
 调用 /env-setup
@@ -20,6 +24,8 @@
 
 用 Phase 1 中的功能描述生成一个工作名称，最小化创建：
 
+**Checkpoint 写入**：`{ "phase": 2, "step": "2.2", "stepName": "plugin-create", "nextCommand": "npx @byted-meego/cli@builder create ...", "nextStep": "2.2 创建插件" }`
+
 ```
 调用 /plugin-create mode=pipeline
 ```
@@ -31,9 +37,13 @@
 
 **产出：** `plugin.config.json` + 工程目录
 
+**Checkpoint 更新**：create 成功后将 `context.pluginId` 和 `context.siteDomain` 写入 checkpoint。
+
 ## 2.3 拉取 Schema + 确认点位
 
 ### 2.3.1 拉取 Schema
+
+**Checkpoint 写入**：`{ "step": "2.3", "stepName": "schema + 点位确认", "nextCommand": "npx @byted-meego/cli@builder schema > point-schema.yaml", "nextStep": "2.3.1 拉取 Schema" }`
 
 ```bash
 npx @byted-meego/cli@builder schema > point-schema.yaml
@@ -83,6 +93,12 @@ AI 需要：
 
 将确认的点位类型写入配置并推送到后台：
 
+**Checkpoint 写入**：`{ "step": "2.4", "stepName": "meego-point-config", "nextCommand": "npx @byted-meego/cli@builder local-config set ...", "nextStep": "2.4 配置点位" }`
+
+**恢复检查**：若从 checkpoint 恢复，根据 `lastCommand` 判断：
+- `lastCommand` 含 `local-config set` + `lastCommandStatus` = `"success"` → 跳过 set，直接执行 `update`
+- `lastCommand` 含 `update` + `lastCommandStatus` = `"success"` → 点位已配置，跳过整个 2.4
+
 ```
 调用 /meego-point-config mode=pipeline
 ```
@@ -94,6 +110,10 @@ AI 需要：
 - 其他必填字段按点位类型填充默认值
 
 **关键：AI 应尽可能自主完成配置，仅在信息确实不足时才问用户。**
+
+meego-point-config 内部的 CLI 命令执行顺序和 checkpoint 更新：
+1. `local-config set <config>` → 成功后更新 checkpoint: `lastCommand="local-config set"`, `nextCommand="update"`
+2. `npx @byted-meego/cli@builder update` → 成功后更新 checkpoint: `lastCommand="update"`, `nextStep="2.5"`
 
 ## 2.5 阶段输出
 

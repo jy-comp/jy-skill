@@ -1,6 +1,14 @@
 # mode=apply：同步配置 + 构建上传 + 版本发布
 
+**Checkpoint 恢复检查**（仅在 `.plugin-workflow-state.json` 存在时）：
+- `lastCommand` 含 `update` + `"success"` → 跳过 A1，直接执行 A2
+- `lastCommand` 含 `release` + `"success"` → 跳过 A1+A2，直接执行 A3（从 `context.productVersion` 获取版本号）
+- `lastCommand` 含 `publish` + `"success"` → 全部完成，跳到 A4 清理
+- 其他 → 从 A1 开始
+
 ## A1：同步配置到后台（兜底）
+
+**Checkpoint**：执行前写入 `{ nextCommand: "update --source-type=local", nextStep: "A1 同步配置", lastCommandStatus: "running" }`
 
 > 若在点位配置阶段已执行 update，此步为兜底确认。
 
@@ -8,10 +16,12 @@
 npx @byted-meego/cli@builder update --source-type=local 
 ```
 
-- 成功 → 继续 A2
-- 失败 → 展示错误，终止整个发布流程
+- 成功 → **Checkpoint**：`{ lastCommand: "update --source-type=local", lastCommandStatus: "success", nextCommand: "release", nextStep: "A2 构建上传" }` → 继续 A2
+- 失败 → **Checkpoint**：`{ lastCommand: "update --source-type=local", lastCommandStatus: "failed" }` → 展示错误，终止
 
 ## A2：构建 + 上传（release）
+
+**Checkpoint**：执行前写入 `{ nextCommand: "release", nextStep: "A2 构建上传", lastCommandStatus: "running" }`
 
 ```bash
 npx @byted-meego/cli@builder release
@@ -34,7 +44,13 @@ Product version: 1
 
 将提取到的版本号记为 `productVersion`，作为下一步 publish 的入参。
 
+**Checkpoint**（release 成功后，**关键**）：`{ lastCommand: "release", lastCommandStatus: "success", nextCommand: "publish ...", nextStep: "A3 版本发布", context: { ..., productVersion: "<提取到的版本号>" } }`
+
+> **必须将 `productVersion` 保存到 checkpoint 的 `context` 中**，否则中断恢复后无法跳过 release 直接 publish。
+
 ### 失败处理
+
+**Checkpoint**：`{ lastCommand: "release", lastCommandStatus: "failed" }`
 
 **webpack 错误（自动修复最多 1 轮）**：
 
@@ -56,6 +72,8 @@ webpack 错误：
 ```
 
 ## A3：版本发布（publish）
+
+**Checkpoint**：执行前写入 `{ nextCommand: "publish --product-version <X>", nextStep: "A3 版本发布", lastCommandStatus: "running" }`
 
 release 成功后，AI 自动准备 publish 参数，**无需向用户逐个收集**：
 
@@ -85,6 +103,8 @@ npx @byted-meego/cli@builder publish \
 
 ### 成功
 
+**Checkpoint**：`{ lastCommand: "publish", lastCommandStatus: "success", nextStep: "A4 清理" }`
+
 `npx @byted-meego/cli@builder publish` 输出分享链接：
 
 ```
@@ -93,6 +113,8 @@ Plugin share url: https://meego.example.com/openapp/plugin_share?appKey=PL_xxx
 ```
 
 ### 失败处理
+
+**Checkpoint**：`{ lastCommand: "publish", lastCommandStatus: "failed" }`
 
 | 错误类型 | 处理方式 |
 |---------|---------|

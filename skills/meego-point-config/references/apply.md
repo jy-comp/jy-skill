@@ -5,7 +5,15 @@
 - 需要 plan 阶段生成的 `plugin.temp.local-{timestamp}.json`
 - 若无该文件，先执行 `mode=plan`
 
+**Checkpoint 恢复检查**（仅在 `.plugin-workflow-state.json` 存在时）：
+- `lastCommand` 含 `local-config set` + `"success"` → 跳过 A1，直接执行 A2
+- `lastCommand` 含 `update --source-type=local` + `"success"` → 跳过 A1+A2，直接执行 A3
+- `lastCommand` 含 `update` (不含 --source-type) + `"success"` → 跳过 A1+A2+A3，直接执行 A4
+- 其他 → 从 A1 开始
+
 ## A1：Schema 校验（local-config set）
+
+**Checkpoint**：执行前写入 `{ nextCommand: "local-config set ...", nextStep: "A1 Schema 校验", lastCommandStatus: "running" }`
 
 ```bash
 npx @byted-meego/cli@builder local-config set --config '<plugin.temp.local-{timestamp}.json 的完整 JSON 内容>'
@@ -15,9 +23,13 @@ npx @byted-meego/cli@builder local-config set --config '<plugin.temp.local-{time
 
 ### 成功
 
+**Checkpoint**：`{ lastCommand: "local-config set", lastCommandStatus: "success", nextCommand: "update --source-type=local", nextStep: "A2 推送远端" }`
+
 继续执行 A2。
 
 ### 失败 — 错误分类处理
+
+**Checkpoint**：`{ lastCommand: "local-config set", lastCommandStatus: "failed" }`
 
 | 错误类型 | 处理方式 |
 |----------|---------|
@@ -31,14 +43,18 @@ npx @byted-meego/cli@builder local-config set --config '<plugin.temp.local-{time
 
 ## A2：推送远端（update）
 
+**Checkpoint**：执行前写入 `{ nextCommand: "update --source-type=local", nextStep: "A2 推送远端", lastCommandStatus: "running" }`
+
 ```bash
 npx @byted-meego/cli@builder update --source-type=local
 ```
 
-- 成功 → 继续执行 A3
-- 失败 → 报错展示，终止（不继续后续步骤）
+- 成功 → **Checkpoint**：`{ lastCommand: "update --source-type=local", lastCommandStatus: "success", nextCommand: "update", nextStep: "A3 拉取远端配置" }` → 继续执行 A3
+- 失败 → **Checkpoint**：`{ lastCommand: "update --source-type=local", lastCommandStatus: "failed" }` → 报错展示，终止
 
 ## A3：拉取远端配置到本地（update）
+
+**Checkpoint**：执行前写入 `{ nextCommand: "update", nextStep: "A3 拉取远端配置", lastCommandStatus: "running" }`
 
 推送成功后，**必须**再执行一次 update 将远端配置（含模板等）同步回本地 `plugin.config.json`：
 
@@ -48,8 +64,8 @@ npx @byted-meego/cli@builder update
 
 > **禁止直接修改 `plugin.config.json`。** 始终通过 `update` 命令让 CLI 自动同步，确保本地配置与远端一致。
 
-- 成功 → 继续执行清理
-- 失败 → 报错展示，但不影响已推送的远端配置
+- 成功 → **Checkpoint**：`{ lastCommand: "update", lastCommandStatus: "success", nextStep: "A4 清理临时文件" }` → 继续执行清理
+- 失败 → **Checkpoint**：`{ lastCommand: "update", lastCommandStatus: "failed" }` → 报错展示，但不影响已推送的远端配置
 
 ## A4：清理临时文件（强制）
 

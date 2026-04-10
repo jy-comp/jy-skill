@@ -12,6 +12,45 @@ metadata:
 
 本技能包含 Meego 插件开发的公共认证、环境检查和安全规则。所有其他 skill 在执行前必须先确认本 skill 中的前置条件已满足。
 
+## 插件工程识别
+
+**当 AI 进入一个目录时，应检查是否为 Meego 插件工程。** 识别规则：
+
+### 判定条件
+
+当前目录（或用户指定的工作目录）存在 `plugin.config.json`，且文件包含以下必要字段：
+
+```json
+{
+  "siteDomain": "https://meego.feishu-boe.cn",   // 站点域名（必有）
+  "pluginId": "MII_xxxxxxxxxxxx",                 // 插件 ID，MII_ 前缀（必有）
+  "pluginSecret": "...",                           // 加密后的密钥（必有）
+  "resources": [...]                               // 资源列表（可能为空数组）
+}
+```
+
+**判定为插件工程的充要条件**：`plugin.config.json` 存在 **且** 包含 `pluginId` 字段（以 `MII_` 开头）。
+
+> 注：v1 框架的旧插件使用 `manifest.json`，当前 skill 体系仅适用于 v2 框架（`plugin.config.json`）。
+
+### 从配置中可获取的上下文
+
+| 字段 | 含义 | 用途 |
+|------|------|------|
+| `siteDomain` | 站点域名 | CLI 命令自动读取，无需手动传 `--site-domain` |
+| `pluginId` | 插件唯一标识 | 所有 API 操作的目标 |
+| `pluginSecret` | 加密密钥 | CLI 内部使用，**禁止明文输出** |
+| `resources` | 资源列表 | 每项含 `id`（点位资源标识）和 `entry`（代码入口路径） |
+| `resources[].id` | 资源 ID | 格式 `{点位类型}_{平台}_{后缀}`，从前缀可判断点位类型（如 `board_web_xxx`、`button_web_xxx`） |
+| `source_type` | 配置来源 | `remote`（默认）或 `local` |
+
+### 识别后的行为
+
+一旦确认当前目录为插件工程：
+1. 所有 CLI 命令均可直接执行（`siteDomain`、`pluginId` 等自动从配置读取）
+2. 用户的操作指令（"启动调试"、"发布"、"改名称"等）应路由到 `meego-cli` skill 查找对应命令
+3. 涉及多步编排的操作（"加个点位"、"做一个新功能"）应路由到对应的编排 skill
+
 ## CLI 可用性检查
 
 ```bash
@@ -104,6 +143,59 @@ Token 按域名生效，确定 `siteDomain` 的优先级：
 - **禁止输出密钥**（accessToken、pluginSecret）到终端明文
 - **写入/删除操作前必须确认用户意图**（如发布、删除点位等不可逆操作）
 - **全量提交约束**：`local-config set` 和 `update --source-type=local` 均为全量操作，禁止只传变更部分
+
+### 禁止编造 URL（CRITICAL）
+
+**绝对禁止编造任何 URL 或图标地址。** 编造的 mock URL（如 `https://example.com/webhook`）在实际使用中完全不可用，会导致插件功能失效。
+
+各类 URL 字段的处理策略：
+
+| 字段 | 所属点位 | 处理方式 |
+|------|---------|---------|
+| `intercept.url` | intercept | **必须向用户询问**（业务回调地址，无法猜测） |
+| `listen_event.url` | listen_event | **必须向用户询问**（同上） |
+| `builder_comp.icon_url` | builder_comp | **不阻塞**，不填则 CLI 自动填充默认图标 |
+| 插件图标 icon | update-description | **不阻塞**，不传则保持后台默认图标 |
+
+**执行原则：**
+- `url` 类字段（intercept、listen_event）：**必须暂停流程向用户询问**，这些是业务回调地址和密钥，无法猜测
+- `icon_url` / 插件图标：**不阻塞流程**，不填即可，CLI/后台会自动使用默认图标
+- 如果用户暂时没有 url，可以使用**不可能被误认为真实地址的占位符**（如 `"<PLACEHOLDER: 请替换为你的回调地址>"`）并在摘要中醒目标注待替换项
+- **禁止使用** `https://example.com`、`https://your-server.com` 等看似真实但不可用的地址
+
+## Checkpoint（进度追踪）
+
+当子 skill 被 `plugin-workflow` 调用时（即项目根目录存在 `.plugin-workflow-state.json`），**每个 CLI 命令执行前后必须更新 checkpoint 文件**。
+
+### 判断规则
+
+1. 读取项目根目录 `.plugin-workflow-state.json`
+2. **存在** → 当前处于 workflow 编排中，每步 CLI 前后更新此文件
+3. **不存在** → 子 skill 被独立调用，不需要写 checkpoint
+
+### 更新协议
+
+```
+CLI 命令执行前：
+  → 写入 nextCommand、nextStep，lastCommandStatus 设为 "running"
+
+CLI 命令执行后（成功）：
+  → lastCommand = 刚执行的命令
+  → lastCommandStatus = "success"
+  → nextCommand/nextStep 更新为下一步
+
+CLI 命令执行后（失败）：
+  → lastCommand = 刚执行的命令
+  → lastCommandStatus = "failed"
+  → 保留 nextCommand/nextStep 不变（重试时使用）
+```
+
+### 恢复语义
+
+当 workflow 从 checkpoint 恢复并调用子 skill 时，子 skill 应检查 `lastCommand` + `lastCommandStatus`：
+- 上一步 `"success"` → 跳过该步，执行下一步
+- 上一步 `"failed"` → 重试该步
+- 上一步 `"running"` → 未知状态，重新执行该步
 
 ## 错误处理
 

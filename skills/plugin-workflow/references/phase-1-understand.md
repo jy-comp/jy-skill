@@ -45,7 +45,32 @@
 
 ## 1.3 断点恢复
 
-若用户中途回来继续，检查当前目录状态：
+**每次 workflow 启动时必须执行此检查。**
+
+### 优先级 1：读取 checkpoint 文件（精确恢复）
+
+检查当前项目根目录是否存在 `.plugin-workflow-state.json`：
+
+**存在时**，读取并向用户展示精确进度：
+
+```
+📍 上次执行到 Phase {phase} — {stepName}
+   最后完成：`{lastCommand}`（{lastCommandStatus}）
+   下一步：{nextStep} → `{nextCommand}`
+继续吗？
+```
+
+- `lastCommandStatus` 为 `"success"` → 从 `nextStep` 继续
+- `lastCommandStatus` 为 `"failed"` → 提示用户"上次 `{lastCommand}` 执行失败，是否重试？"
+- `lastCommandStatus` 为 `"running"` → 说明上次在执行中被中断，提示用户"上次正在执行 `{nextCommand}`，未知是否完成，建议重新执行"
+
+用户确认后跳转到对应 Phase 继续。
+
+### 优先级 2：artifact 推断（兜底恢复）
+
+若 `.plugin-workflow-state.json` 不存在，降级为 artifact 检查：
 - 无 `plugin.config.json` → 从 Phase 2 开始
 - 有 `plugin.config.json` 但无代码 → 检查点位是否已配置，从 Phase 2 或 3 开始
 - 有代码 → 从 Phase 3 调试或 Phase 4 发布开始
+
+> 注：artifact 推断无法区分细粒度中间态（如"set 成功但 update 未执行"），仅作为 checkpoint 缺失时的兜底。

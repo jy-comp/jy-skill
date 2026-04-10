@@ -23,6 +23,23 @@ npx @byted-meego/cli@builder local-config get > plugin.temp.local-remote.json
 
 **规则：一次只问一个问题**，语义化表达（例：不说"key 是什么"，而说"这个点位的唯一标识符打算用什么？建议格式如 my_board_point"）。
 
+### 禁止编造 URL（CRITICAL）
+
+**绝对禁止编造任何 URL、icon_url、token 值。** 编造的 mock URL（如 `https://example.com/webhook`、`https://your-server.com/callback`）在实际使用中完全不可用，会导致插件功能失效。
+
+| 字段 | 所属点位 | 处理方式 |
+|------|---------|---------|
+| `url` | intercept, listen_event | **必须向用户询问**（业务回调地址，无法猜测） |
+| `token` | intercept, listen_event | **必须向用户询问**（安全校验密钥） |
+| `icon_url` | builder_comp | **不阻塞**，不填则 CLI 自动填充默认图标 |
+
+**遇到 url/token 字段时**：暂停自动填充流程，明确向用户提问，例如：
+> "intercept 点位需要一个回调 URL（服务端接收事件推送的地址）和验证 token，请提供。如果暂时没有，我可以先用占位符标记，发布前需要替换。"
+
+如果用户表示暂时没有，使用**不可能被误认为真实地址的占位符**：`"<PLACEHOLDER: 请替换为你的回调地址>"` 并在输出摘要中**醒目标注待替换项**。
+
+> `icon_url` 和插件图标不需要询问用户，不填即可，CLI/后台会自动使用默认图标。
+
 ### 各类型必须确认的字段
 
 | 类型 | 必须确认（若未提供） |
@@ -33,11 +50,11 @@ npx @byted-meego/cli@builder local-config get > plugin.temp.local-remote.json
 | config | key |
 | control | key、name（≤100字符）、work_item_type |
 | button | key、name（≤15字符）、work_item_type、platform.web.mode（ui/script） |
-| intercept | key、name（≤15字符）、url、token、event_config（至少1条，需确认 work_item_type 和 event_type 数字编号） |
-| listen_event | url、token、event_config（同上） |
+| intercept | key、name（≤15字符）、**url（必须向用户询问）**、**token（必须向用户询问）**、event_config（至少1条，需确认 work_item_type 和 event_type 数字编号） |
+| listen_event | **url（必须向用户询问）**、**token（必须向用户询问）**、event_config（同上） |
 | component | key、component_type（以 schema 枚举为准，目前支持轻应用） |
 | field_template | key、i18n_info.name（≤50字符）、i18n_info.description、subfield（至少1条：name/field_type枚举/field_key）、platform.web.resource、platform.mobile.resource、platform.mobile.mobile_block_style |
-| builder_comp | key、icon_url、i18n_info（多语言）、properties（至少1条）、platform.web.resource、platform.web.layout.mode（0/1） |
+| builder_comp | key、i18n_info（多语言）、properties（至少1条）、platform.web.resource、platform.web.layout.mode（0/1）；icon_url 可不填（CLI 自动填充默认图标） |
 
 ### 对于删除操作
 

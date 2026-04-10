@@ -77,9 +77,61 @@ metadata:
 /plugin-workflow phase=4                # 仅发布上线
 ```
 
+## 进度追踪（Checkpoint 机制）
+
+每次执行 CLI 命令或关键步骤前后，**MUST** 更新项目根目录的 `.plugin-workflow-state.json`，使中断后能精确恢复。
+
+### 文件格式
+
+```json
+{
+  "phase": 2,
+  "step": "2.4",
+  "stepName": "meego-point-config",
+  "lastCommand": "npx @byted-meego/cli@builder local-config set ...",
+  "lastCommandStatus": "success",
+  "nextCommand": "npx @byted-meego/cli@builder update",
+  "nextStep": "2.4 推送远端",
+  "timestamp": "2026-04-10T14:30:00Z",
+  "context": {
+    "pluginId": "MII_xxx",
+    "siteDomain": "https://meego.feishu-boe.cn"
+  }
+}
+```
+
+### 写入规则
+
+| 时机 | 动作 |
+|------|------|
+| 执行 CLI 命令**前** | 写入 `nextCommand` + `nextStep`，`lastCommandStatus` 设为 `"running"` |
+| 执行 CLI 命令**后** | 写入 `lastCommand` = 刚执行的命令，`lastCommandStatus` = `"success"` / `"failed"` |
+| 进入新 Phase/Step | 更新 `phase` + `step` + `stepName` |
+| Phase 4 发布成功 | 删除 `.plugin-workflow-state.json`（流程已完成） |
+
+### 恢复规则
+
+每次 workflow 启动时：
+1. 检查 `.plugin-workflow-state.json` 是否存在
+2. 存在时向用户展示恢复摘要：
+   ```
+   📍 上次执行到 Phase {phase} — {stepName}
+      最后完成：`{lastCommand}`（{lastCommandStatus}）
+      下一步：{nextStep} → `{nextCommand}`
+   继续吗？
+   ```
+3. 用户确认后从断点继续；`lastCommandStatus` 为 `"failed"` 时提示是否重试
+
+### 注意
+
+- 此文件仅供 AI 读写，不影响 CLI 行为，不需要加入 `.gitignore`（插件目录本身不纳入 git）
+- 各子 skill（meego-point-config、plugin-publish 等）在被 workflow 调用时同样需要更新此文件
+- 独立调用子 skill 时（非 workflow 编排），不强制要求写 checkpoint
+
 ## 关键设计原则
 
 1. **最小打断**：只在必须用户决策时才暂停，其余 AI 自动处理
 2. **延迟填充**：插件名称/描述/分类在发布前由 AI 总结生成，不在创建时问用户
 3. **快速到调试**：尽快让用户看到实际效果，通过调试预览来验证需求理解是否正确
 4. **容错兜底**：每个阶段失败不影响已完成的步骤，可从断点继续
+5. **精确恢复**：通过 checkpoint 文件记录每一步 CLI 操作状态，中断后能告知用户确切进度

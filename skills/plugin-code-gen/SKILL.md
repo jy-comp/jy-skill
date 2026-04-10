@@ -2,8 +2,8 @@
 name: plugin-code-gen
 version: 1.0.0
 description: |
-  Meego 插件前端代码生成（内部 skill）：根据已配置的点位，AI 直接生成各点位对应的 React 代码文件。
-  当用户在已有插件工程中明确说"生成代码"、"帮我写插件代码"时触发，或由 plugin-workflow 内部调用。
+  Meego 插件前端代码生成（编排 skill）：根据已配置的点位，AI 生成各点位对应的 React 代码文件。
+  当用户在插件工程中说"生成代码"、"帮我写插件代码"、"实现功能"时触发，或由 plugin-workflow 内部调用。
   前提：meego-point-config skill 已执行完毕，点位配置已推送远端。
 metadata:
   requires:

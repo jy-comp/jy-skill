@@ -2,8 +2,8 @@
 name: plugin-create
 version: 1.0.0
 description: |
-  Meego 插件工程创建（内部 skill）：最小化创建插件工程骨架。
-  当用户明确说"创建插件工程"、"初始化插件项目"时触发，或由 plugin-workflow 内部调用。
+  Meego 插件工程创建（编排 skill）：最小化创建插件工程骨架。
+  当用户说"创建插件工程"、"初始化插件项目"、"新建一个插件"时触发，或由 plugin-workflow 内部调用。
   若用户说"我需要一个 xxx 功能"，应由 plugin-workflow 统一编排，而非直接调用此 skill。
   前提：env-setup skill 已执行（CLI 可用、Token 已配置）。
 metadata:

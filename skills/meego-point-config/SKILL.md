@@ -2,8 +2,8 @@
 name: meego-point-config
 version: 1.0.0
 description: |
-  Meego 插件点位配置管理（内部 skill）：添加/修改/删除点位配置。
-  当用户在已有插件工程中明确说"加个看板点位"、"改一下拦截点位"、"删除某个点位"、"配置点位"时触发，或由 plugin-workflow 内部调用。
+  Meego 插件点位配置管理（编排 skill）：添加/修改/删除点位配置。
+  当用户在插件工程中说"加个看板点位"、"改一下拦截点位"、"删除某个点位"、"配置点位"时触发，或由 plugin-workflow 内部调用。
   若用户是从零开始说"我需要一个 xxx 功能"，应由 plugin-workflow 统一编排。
   前提：当前目录必须存在 plugin.config.json 且已安装 @byted-meego/cli@builder。
 metadata:
