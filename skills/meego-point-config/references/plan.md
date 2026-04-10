@@ -121,6 +121,7 @@ npx @byted-meego/cli@builder local-config get > plugin.temp.local-remote.json
 - [ ] 必填字段均已填写
 - [ ] 枚举值合法（mode、mobile_block_style、field_type、view.icon）
 - [ ] name 长度在限制内
+- [ ] **platform.web 字段以 schema 中对应 `PlatformWebFor{Type}` 定义为准，禁止跨点位类型混用**（如 `table_url` 属于 field_template，不能写在 control 里；`mode`/`init_size` 属于 button，不能写在其他类型里）
 
 ## P5：清理临时文件（强制）
 
