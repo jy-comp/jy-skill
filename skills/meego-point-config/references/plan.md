@@ -70,7 +70,7 @@ npx @byted-meego/cli@builder local-config get > plugin.temp.local-remote.json
 
 ## P4：生成完整配置文件
 
-**⚠️ 核心原则：set 是全量替换，必须基于远端完整数据操作。**
+**⚠️ CRITICAL：set 是全量替换，必须基于 `get --remote` 拉取的远端完整数据操作。遗漏任何现有点位都会导致被永久删除。**
 
 基于 `plugin.temp.local-remote.json` 的全量配置：
 
@@ -96,7 +96,7 @@ npx @byted-meego/cli@builder local-config get > plugin.temp.local-remote.json
 结果: { "button": [{ "key": "button_x1", "name": "新名" }, { "key": "button_x2", 原样 }] }
 ```
 
-### 删除操作
+### 删除操作（CRITICAL — 须用户确认）
 
 从对应类型数组中移除匹配 key 的点位，**其余原样保留**。
 
@@ -110,6 +110,8 @@ npx @byted-meego/cli@builder local-config get > plugin.temp.local-remote.json
 ```
 
 **⚠️ 如果只传 `{ "builder_comp": [新点位] }` 而不包含 board 和 button，远端的 board 和 button 将被清除！**
+
+**删除确认规则：** 生成的完整 JSON 相比远端减少了任何点位时，**必须先向用户列出即将被删除的点位清单（key + name），获得明确确认后才能执行 set。** 禁止静默删除。
 
 生成文件名：`plugin.temp.local-{YYYY-MM-DD_HHmmss}.json`
 

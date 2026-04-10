@@ -87,18 +87,23 @@ mode=pipeline（默认）→ setup → plan → apply → verify
 | `plugin.temp.local-remote.json` | 当前远端配置（local 格式），**plan 完成后必须删除** |
 | `plugin.temp.local-{timestamp}.json` | 本次生成的配置，**apply 完成后必须删除** |
 
-## 全量提交约束（核心机制）
+## 全量提交约束（CRITICAL — 防数据丢失）
 
-`local-config set` 和 `update --source-type=local` 均为**全量替换**——提交什么就存什么，远端不做合并。
+`local-config set` 和 `update --source-type=local` 均为**全量替换**——提交什么就存什么，远端不做合并。**遗漏任何现有点位都会导致该点位被永久删除。**
 
 **必须遵循的操作流程：**
-1. 先 `local-config get` 获取远端**完整配置**作为基础
+1. 先 `local-config get --remote` 获取远端**完整配置**作为基础
 2. 在完整配置基础上做**局部增删改**
 3. 将修改后的**完整配置**提交（包含所有点位类型、所有点位实例）
 4. 推送成功后执行 `npx @byted-meego/cli@builder update` 将远端配置同步回本地
 
+**删除操作须用户确认（CRITICAL）：**
+- 当 set 的 JSON 相比远端**减少了**点位（无论是删除某个点位实例还是整个类型），**必须先向用户列出即将被删除的点位清单，获得明确确认后才能执行 set**
+- 禁止静默删除——即使用户只说"修改 X"，如果生成的 JSON 意外少了其他点位，也必须中止并提醒
+
 **严禁以下行为：**
 - 只传变更部分（会导致未传的点位被删除）
+- 不经确认删除任何已有点位
 - 直接修改 `plugin.config.json`（始终通过 CLI 命令同步）
 
 ### 增/改/删操作模式

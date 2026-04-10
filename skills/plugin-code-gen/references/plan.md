@@ -22,6 +22,7 @@
 **禁止凭记忆编写 JSSDK 调用代码。** 必须先查询目标点位的 API 名称和 FeatureContext 字段：
 
 1. **优先**：通过飞书项目知识 MCP 查询目标点位的 JSSDK API 用法和 FeatureContext 类型
+   - 如果当前环境未配置飞书项目知识 MCP，**提示用户前往 `{siteDomain}/openapp/mcp/docs` 获取 MCP 配置 URL 并完成配置**（`siteDomain` 从 `./plugin.config.json` 的 `siteDomain` 字段读取）
 2. **降级**：读取 `node_modules/@lark-project/js-sdk/dist/types/index.d.ts` 获取类型定义
 3. **禁止**：跳过查询直接编写 `window.JSSDK.xxx` 调用代码
 

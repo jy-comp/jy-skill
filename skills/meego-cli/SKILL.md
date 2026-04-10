@@ -136,7 +136,7 @@ metadata:
 ### "能回退版本吗" / "撤销发布"
 
 CLI 不支持版本回退。处理方式：
-- 需要在 Meego 后台（`{siteDomain}/openapp/{pluginId}`）手动管理版本
+- 需要在 Meego 后台（`{siteDomain}/openapp/{pluginId}`）手动管理版本（`siteDomain` 和 `pluginId` 从 `./plugin.config.json` 读取）
 
 ### "改一下代码" / "调整 xxx 逻辑"
 
@@ -304,14 +304,16 @@ npx @byted-meego/cli@builder local-config get --remote
 npx @byted-meego/cli@builder local-config set --config '<完整 JSON>'
 ```
 
-**全量替换语义**：`local-config set` 是**全量覆盖**，必须传完整配置（所有点位），不能只传变更部分。
+**全量替换语义（CRITICAL）**：`local-config set` 是**全量覆盖**，必须传完整配置（所有点位），不能只传变更部分。遗漏任何现有点位都会导致该点位被永久删除。
 
 **典型流程**：
-1. `local-config get` → 获取当前完整配置
+1. `local-config get --remote` → 获取远端当前完整配置
 2. 在完整配置基础上增删改
 3. `local-config set --config '<修改后的完整 JSON>'` → 校验 + 写入本地
 4. `update --source-type=local` → 推送到远端
 5. `update` → 拉取远端配置同步回本地
+
+**删除确认**：如果 set 的 JSON 相比远端减少了点位，必须先向用户列出将被删除的点位清单并获得确认，禁止静默删除。
 
 ### 生成 Schema
 
