@@ -69,7 +69,9 @@ npx @byted-meego/cli@builder schema > point-schema.yaml
 AI 需要：
 1. 解析 schema 中所有可用的点位类型及其描述
 2. 结合用户的功能需求，匹配最合适的点位类型
-3. 一个功能可能需要多个点位配合（如展示 + 配置）
+3. 一个功能可能需要**多个独立点位**配合（如展示 + 配置）
+
+> **⚠️ 每种点位类型是独立的顶层概念，不能嵌套。** 例如用户需要"轻应用 + 拓展字段"时，应推荐 `component` 和 `field_template` 两个独立点位，而不是把 field_template 作为 component 或 builder_comp 的属性。同理，"控件"是独立的 `control` 点位，不是某个点位的子配置。
 
 → 进入 2.3.3 向用户确认。
 

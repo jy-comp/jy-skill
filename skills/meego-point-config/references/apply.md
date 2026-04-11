@@ -11,6 +11,22 @@
 - `lastCommand` 含 `update` (不含 --source-type) + `"success"` → 跳过 A1+A2+A3，直接执行 A4
 - 其他 → 从 A1 开始
 
+## A0：Diff 检查 — 删除确认（CRITICAL — 不可跳过）
+
+**无论从哪个入口进入 apply（pipeline、plugin-workflow、单独调用），此步骤都 MUST 执行。**
+
+1. 用 `local-config get --remote` 获取远端当前完整配置
+2. 对比即将提交的 `plugin.temp.local-{timestamp}.json` 与远端配置：
+   - 逐类型对比：远端有哪些点位类型，提交的 JSON 中是否都包含
+   - 逐实例对比：同一类型下，远端有哪些 key，提交的 JSON 中是否都包含
+3. **如果发现任何点位减少**（无论是整个类型缺失还是某个 key 缺失）：
+   - **立即暂停**，向用户列出即将被删除的点位清单（类型 + key + name）
+   - **等待用户明确确认**后才能继续执行 A1
+   - 如果用户拒绝删除，修正配置文件后重新执行 A0
+4. 如果没有点位减少，直接继续执行 A1
+
+> **禁止跳过此步骤。** 即使 plan 阶段已经确认过删除，apply 阶段仍须再次检查——因为配置文件可能在 plan 之后被修改，或者当前 apply 并非从 plan 阶段进入。
+
 ## A1：Schema 校验（local-config set）
 
 **Checkpoint**：执行前写入 `{ nextCommand: "local-config set ...", nextStep: "A1 Schema 校验", lastCommandStatus: "running" }`

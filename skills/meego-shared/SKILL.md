@@ -143,6 +143,7 @@ Token 按域名生效，确定 `siteDomain` 的优先级：
 - **禁止输出密钥**（accessToken、pluginSecret）到终端明文
 - **写入/删除操作前必须确认用户意图**（如发布、删除点位等不可逆操作）
 - **全量提交约束**：`local-config set` 和 `update --source-type=local` 均为全量操作，禁止只传变更部分
+- **删除点位确认（CRITICAL — 适用于所有阶段和所有调用路径）**：在执行 `local-config set` 之前，**MUST** 对比即将提交的 JSON 与远端配置（`local-config get --remote`）。如果提交的 JSON 相比远端**减少了任何点位**（整个类型缺失或某个 key 缺失），**必须立即暂停，向用户列出即将被删除的点位清单（类型 + key + name），获得明确确认后才能执行 set。禁止静默删除。** 此规则无论从 plan、apply、pipeline 还是 plugin-workflow 任何路径进入均须执行，不可跳过。
 
 ### 禁止编造 URL（CRITICAL）
 

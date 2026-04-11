@@ -19,6 +19,51 @@ npx @byted-meego/cli@builder local-config get > plugin.temp.local-remote.json
 
 **推断目标点位类型**（参考 SKILL.md 速查表），如有歧义直接询问。
 
+### ⚠️ 点位类型是彼此独立的顶层概念（CRITICAL — 防混淆）
+
+**每种点位类型在 config JSON 中是独立的顶层 key，绝对不能将一种点位类型作为另一种点位类型的子配置或属性。**
+
+以下 11 种点位类型是**完全平级、互不隶属**的：
+
+```
+board | view | dashboard | config | control | button | intercept | listen_event | component | field_template | builder_comp
+```
+
+**常见混淆（必须识别并纠正）：**
+
+| 错误做法 | 正确做法 | 原因 |
+|---------|---------|------|
+| 把 `field_template` 当成 `builder_comp` 的一个 property | `field_template` 是独立点位，和 `builder_comp` 平级放在 config 顶层 | field_template 有自己独立的 subfield、platform、table_layout，不是 builder_comp 的属性 |
+| 把 `control` 当成 `field_template` 的一部分 | `control` 和 `field_template` 各自独立 | 两者虽然都在工作项表单中展示，但配置结构完全不同 |
+| 用户说"添加拓展字段"却生成 builder_comp 的 properties | 应新增 `field_template` 类型的点位 | "拓展字段"= field_template 点位，不是 builder_comp 属性 |
+| 用户说"添加拓展字段**组件**"却映射到 builder_comp | 应新增 `field_template` 类型的点位 | 用户口语中的"组件"只是泛称，关键词是"拓展字段"→ field_template |
+| 用户说"添加控件"却塞进现有点位的配置里 | 应新增 `control` 类型的点位 | "控件"= control 点位，是独立的顶层配置 |
+
+**术语→点位映射（CRITICAL — "组件"一词极易误导）：**
+
+> schema 中 `builder_comp` 叫"轻应用组件"，`component` 叫"组件位"，但用户日常口语中"组件"可能指任何东西。
+> **不要仅凭"组件"二字就映射到 builder_comp 或 component，必须看完整上下文中的核心名词。**
+
+| 用户可能的说法 | 核心名词 | 正确点位类型 | 易错映射 |
+|--------------|---------|------------|---------|
+| "拓展字段"/"拓展字段组件"/"字段模板"/"自定义字段" | **拓展字段** | `field_template` | ~~builder_comp~~ |
+| "控件"/"控件组件" | **控件** | `control` | ~~builder_comp~~ |
+| "轻应用组件"/"概览组件"/"构建器组件"/"拖拽组件" | **轻应用/概览/构建器** | `builder_comp` | — |
+| "排期组件"/"节点排期" | **排期** | `component` | ~~builder_comp~~ |
+
+**识别规则：先提取核心名词（拓展字段 / 控件 / 轻应用 / 排期），再映射点位类型。"组件"是修饰语，不是判断依据。**
+
+**正确的 config 结构示例（多点位类型共存）：**
+```json
+{
+  "component": [{ "key": "comp_xxx", ... }],
+  "field_template": [{ "key": "field_template_xxx", ... }],
+  "control": [{ "key": "control_xxx", ... }],
+  "builder_comp": [{ "key": "builder_comp_xxx", ... }]
+}
+```
+每种类型各自一个顶层数组，互不嵌套。
+
 ## P3：交互补全缺失字段
 
 **规则：一次只问一个问题**，语义化表达（例：不说"key 是什么"，而说"这个点位的唯一标识符打算用什么？建议格式如 my_board_point"）。
@@ -53,7 +98,7 @@ npx @byted-meego/cli@builder local-config get > plugin.temp.local-remote.json
 | intercept | key、name（≤15字符）、**url（必须向用户询问）**、**token（必须向用户询问）**、event_config（至少1条，需确认 work_item_type 和 event_type 数字编号） |
 | listen_event | **url（必须向用户询问）**、**token（必须向用户询问）**、event_config（同上） |
 | component | key、component_type（以 schema 枚举为准，目前支持轻应用） |
-| field_template | key、i18n_info.name（≤50字符）、i18n_info.description、subfield（至少1条：name/field_type枚举/field_key）、platform.web.resource、platform.mobile.resource、platform.mobile.mobile_block_style |
+| field_template | key、i18n_info.name（≤50字符）、i18n_info.description、subfield（至少1条：i18n_info必填如`{zh:{name:"人员",desc:""}}`、name非必填为空时取i18n_info中文name、field_type枚举、field_key）、platform.web.resource、platform.mobile.resource、platform.mobile.mobile_block_style |
 | builder_comp | key、i18n_info（多语言）、properties（至少1条）、platform.web.resource、platform.web.layout.mode（0/1）；icon_url 可不填（CLI 自动填充默认图标） |
 
 ### 对于删除操作

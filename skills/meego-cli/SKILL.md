@@ -131,6 +131,8 @@ metadata:
    - JSSDK API 属性名拼写错误（如 `Schedule` → `schedule`）
    - FeatureContext 字段不存在（各点位 context 字段不同，参考 `@lark-project/js-sdk` 类型定义）
    - union type 直接解构不安全（如 `ButtonFeatureContext` 需先判断 scene）
+   - Control 和 CustomField API 混用（如在控件代码中调用 `customField.getProps()`）
+   - **排查方式**：传参和返回值以 `node_modules/@lark-project/js-sdk/dist/types/index.d.ts` 为准；查 API 能力可走飞书知识 MCP 或直接读包
 3. 可使用 `/plugin-code-gen mode=verify` 让 AI 自动修复（最多 2 轮）
 
 ### "能回退版本吗" / "撤销发布"
@@ -313,7 +315,7 @@ npx @byted-meego/cli@builder local-config set --config '<完整 JSON>'
 4. `update --source-type=local` → 推送到远端
 5. `update` → 拉取远端配置同步回本地
 
-**删除确认**：如果 set 的 JSON 相比远端减少了点位，必须先向用户列出将被删除的点位清单并获得确认，禁止静默删除。
+**删除确认（CRITICAL — 不可跳过）**：在执行 `local-config set` 之前，**MUST** 先对比提交的 JSON 与远端配置（`local-config get --remote`）。如果提交的 JSON 相比远端减少了任何点位（整个类型缺失或某个 key 缺失），**必须立即暂停**，向用户列出将被删除的点位清单（类型 + key + name）并获得明确确认，禁止静默删除。此规则适用于所有调用路径。
 
 ### 生成 Schema
 
