@@ -34,7 +34,7 @@ mode=pipeline（默认）→ pre-check → apply → verify
 **三步强一致性**：update → release → publish 必须串行执行，任一步失败则终止后续步骤。
 
 **版本号传递**：
-- `npx @byted-meego/cli@builder release` 成功后输出 `productVersion`（如 `1.0.1`）
+- `npx @byted-meego/cli@builder release` 成功后输出 `productVersion`（如 `1 / 2 / 3 / ...`）
 - `productVersion` 作为 `npx @byted-meego/cli@builder publish --product-version` 的入参
 - `--version`（发布版本号）：可选，不传则自动在上一个版本号基础上 patch +1（如 `1.0.0` → `1.0.1`）
 - `--desc-zh`（版本描述）：AI 基于当前代码改动自动总结生成，无需用户提供
@@ -81,6 +81,6 @@ npx @byted-meego/cli@builder publish \
 
 | 产物 | 说明 |
 |------|------|
-| 产物版本号 | 从 `npx @byted-meego/cli@builder release` stdout 解析，如 `1.0.1` |
+| 产物版本号 | 从 `npx @byted-meego/cli@builder release` stdout 解析，如 `1 / 2 / 3 / ...` |
 | 发布版本号 | 自动累加或用户指定的 `--version`，如 `1.0.1` |
 | 分享链接 | `npx @byted-meego/cli@builder publish` 输出的插件分享 URL |
