@@ -53,9 +53,15 @@ npx @byted-meego/cli@builder local-config set --config '<plugin.temp.local-{time
 | 枚举值非法 | 列出合法值，询问用户选择，更新后**重新执行 A1** |
 | key 重复冲突 | AI 自动在 key 后追加数字后缀（如 `_2`、`_3`）生成不冲突的 key，更新配置后**重新执行 A1** |
 | name 超长 | 提示最大长度限制，要求用户缩短，**重新执行 A1** |
+| URL 模式违规（`must match "^https?://"`） | **禁止自创占位 URL**（包括 `.invalid`/`.test`/`.example` 等 RFC 保留 TLD）。暂停流程向用户索取真实 URL 或授权 placeholder 写法，见 `meego-shared/SKILL.md` 的"规则冲突时的兜底"章节，确认后**重新执行 A1** |
+| Token 缺失（`must have required property 'token'`） | 当 `table_url.url` / `url` 有值时，对应 `token` 由 CLI 自动生成（36 位 UUID），AI **不需要**手写。若仍报错，说明 CLI 版本过旧或生成链路失败，如实上报用户排查；**切勿**自行伪造 token 值 |
+| 数值字段类型冲突（`must be number`） | schema 已把 `style.width/height/margin/padding/borderRadius/fontSize/...` 改为 `oneOf: [number, string]`，允许模板表达式（如 `"{{$container.width}}"`）。若仍报错，说明 CLI 本地 schema 版本过旧，引导用户更新 `@byted-meego/cli@builder` 到最新 builder 版本后**重新执行 A1** |
+| `table_cell must be object` | schema 已支持 `table_cell` 同时接受 object 与 JSON string（向后兼容），CLI 归一化前置。若报错说明 schema 版本过旧，同上引导用户升级 CLI 后**重新执行 A1**；**切勿**为了绕过而擅自把 string 改写成 object（会丢失"向后兼容"测试目的） |
 | 未知错误 | 展示原始错误给用户，共同分析后**重新执行 A1** |
 
 循环直至 set 成功。
+
+> **通用原则：** 校验失败时 AI 的默认动作是"停下来问用户"，不是"悄悄发明绕过方案"。任何自主修正都必须（1）不改变被测语义；（2）明确在对话中说明；（3）记入最终产物的 TODO 标记。
 
 ## A2：推送远端（update）
 

@@ -42,7 +42,7 @@ npx @byted-meego/cli@builder local-config get --remote
 > **MUST — 此步骤不可跳过。** verify 是 point-config 流程的最后一步，以下临时文件已无任何下游消费者，必须立即删除。如果文件不存在则跳过，不报错。
 
 ```bash
-rm -f point-schema.yaml plugin.temp.local-remote.json
+rm -f point-schema.json point-schema.yaml plugin.temp.local-remote.json
 ```
 
 清理完成后再输出 verify 结果。

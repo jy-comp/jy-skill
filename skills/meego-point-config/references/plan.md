@@ -3,19 +3,21 @@
 ## P1：获取 Schema 和当前完整配置
 
 ```bash
-npx @byted-meego/cli@builder schema > point-schema.yaml
+npx @byted-meego/cli@builder schema > point-schema.json
 npx @byted-meego/cli@builder local-config get > plugin.temp.local-remote.json
 ```
 
 - 若 `local-config get` 返回空，以 `{}` 作为基础
 - **两个命令并行执行**，不要等第一个完成再跑第二个
+- 这两个命令的 stdout 是纯 JSON（CLI v2.6.0+ 会自动避免输出 `[INFO]` 日志），若旧版 CLI 残留日志需 `2>/dev/null` 去噪后再使用
+- 文件后缀使用 `.json`（内容就是 JSON）；勿再沿用 `.yaml` 扩展名
 
 ## P2：识别操作类型和点位类型
 
 结合以下信息综合判断：
 - 用户的原始描述（添加/修改/删除）
 - 飞书项目知识 MCP（查询 work_item_type 枚举值、event_type 编号等业务背景）
-- `point-schema.yaml` 中的字段约束和枚举
+- `point-schema.json` 中的字段约束和枚举
 
 **推断目标点位类型**（参考 SKILL.md 速查表），如有歧义直接询问。
 
@@ -173,7 +175,7 @@ board | view | dashboard | config | control | button | intercept | listen_event 
 ## P5：清理临时文件（强制）
 
 > **MUST — 此步骤不可跳过。** `plugin.temp.local-remote.json` 仅在 plan 阶段使用，生成配置文件后立即删除。
-> `point-schema.yaml` 在后续 polish 阶段仍需参考，此处保留，发布完成后由 plugin-publish 统一清理。
+> `point-schema.json` 在后续 polish 阶段仍需参考，此处保留，发布完成后由 plugin-publish 统一清理。
 
 ```bash
 rm -f plugin.temp.local-remote.json

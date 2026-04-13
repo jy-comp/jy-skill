@@ -155,14 +155,30 @@ Token 按域名生效，确定 `siteDomain` 的优先级：
 |------|---------|---------|
 | `intercept.url` | intercept | **必须向用户询问**（业务回调地址，无法猜测） |
 | `listen_event.url` | listen_event | **必须向用户询问**（同上） |
+| `control.table_url.url` / `customfield.table_data_url` | control / field_template | **必须向用户询问**（webhook 数据接口地址） |
+| `template.onClick.params.url` (action=httpRequest) | table_cell DSL | **必须向用户询问**（业务回调地址） |
 | `builder_comp.icon_url` | builder_comp | **不阻塞**，不填则 CLI 自动填充默认图标 |
 | 插件图标 icon | update-description | **不阻塞**，不传则保持后台默认图标 |
 
 **执行原则：**
-- `url` 类字段（intercept、listen_event）：**必须暂停流程向用户询问**，这些是业务回调地址和密钥，无法猜测
+- `url` 类字段（intercept、listen_event、table_url、httpRequest.params.url）：**必须暂停流程向用户询问**，这些是业务回调地址和密钥，无法猜测
 - `icon_url` / 插件图标：**不阻塞流程**，不填即可，CLI/后台会自动使用默认图标
 - 如果用户暂时没有 url，可以使用**不可能被误认为真实地址的占位符**（如 `"<PLACEHOLDER: 请替换为你的回调地址>"`）并在摘要中醒目标注待替换项
-- **禁止使用** `https://example.com`、`https://your-server.com` 等看似真实但不可用的地址
+- **禁止使用** `https://example.com`、`https://your-server.com`、`https://PLACEHOLDER.invalid/...` 等看似真实但不可用的地址
+
+### 规则冲突时的兜底（CRITICAL — 不可擅自绕过）
+
+**当 `<PLACEHOLDER: ...>` 字面量与 schema/CLI 校验冲突时**（例如 schema 的 `UrlHttp` 要求 `^https?://`，导致纯文本占位符被 `local-config set` 拒绝），**AI MUST 立即暂停并向用户上报冲突**，不得自作主张采取任何"看似合理"的折中（包括但不限于：使用 RFC 保留 TLD `.invalid`/`.test`/`.example`、伪造看起来不真实的域名、把 PLACEHOLDER 塞进 URL path/query 里拼成合法 URL）。
+
+**正确处理流程：**
+1. 停止当前 apply/set 流程
+2. 向用户明确说明：
+   - 哪个字段
+   - 为什么占位符不能通过校验（引用具体 schema 错误）
+   - 两个选项：(a) 提供真实 URL（推荐）；(b) 明确授权某种 placeholder 写法
+3. 等待用户回复后再继续
+
+**为什么这条规则存在：** 任何被 AI 发明出来的"像 URL 的字符串"都可能被用户当成"已经填好了"漏掉替换，上线后静默失败；且自创占位符破坏评测的独立性（AI 用巧思替代了"向用户要真信息"的硬规则）。**"绝对禁止编造"是绝对的，遇到阻力时默认动作是问用户，不是发明绕过方案。**
 
 ## Checkpoint（进度追踪）
 
