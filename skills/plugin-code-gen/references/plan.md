@@ -21,7 +21,7 @@
 
 **禁止凭记忆编写 JSSDK 调用代码。** 必须先查询目标点位的 API 名称和 FeatureContext 字段。
 
-工具选型遵循 [`../../meego-shared/SKILL.md`](../../meego-shared/SKILL.md) 的"工具职责划分"（飞书项目知识 MCP / lark-project skill / CLI schema 三分法），在其之上补充本 skill 的一条细化原则：
+工具选型遵循 [`../../meego-shared/SKILL.md`](../../meego-shared/SKILL.md) 的"工具职责划分"（飞书项目知识 MCP / CLI schema<!-- TODO(lark-project): 调试完成后补回：/ lark-project skill 三分法 --> 分法），在其之上补充本 skill 的一条细化原则：
 
 > **飞书知识查能力，包定义查签名。** 飞书项目知识 MCP 适合回答"这个点位能做什么、API 怎么用、有哪些场景"；`node_modules/@lark-project/js-sdk/dist/types/index.d.ts` 是方法签名/参数/返回值的唯一权威，两者冲突时以包内类型定义为准。
 
@@ -29,8 +29,10 @@
 
 1. **查能力**：用飞书项目知识 MCP 检索目标点位可用的 JSSDK API、场景、注意事项；若未配置 MCP，提示用户前往 `{siteDomain}/openapp/mcp/docs` 获取配置 URL（`siteDomain` 从 `./plugin.config.json` 读取）
 2. **查签名**：读取 `node_modules/@lark-project/js-sdk/dist/types/index.d.ts`，以精确类型为准写代码，不可凭 MCP 示例推断参数结构
+<!-- TODO(lark-project): 调试完成后启用
 3. **查实例数据**：若代码中需要真实的工作项/视图/空间 ID 或字段值，通过 `lark-project` skill 查询，禁止从对话上下文或 schema 脑补
-4. **禁止**：跳过上述步骤直接写 `window.JSSDK.xxx` 调用
+-->
+3. **禁止**：跳过上述步骤直接写 `window.JSSDK.xxx` 调用
 
 ### 代码溯源协议（CRITICAL — 禁止从 schema 脑补代码）
 
