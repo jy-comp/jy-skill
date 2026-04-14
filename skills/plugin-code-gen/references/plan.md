@@ -27,7 +27,15 @@
 
 ### 查询流程
 
-1. **查能力**：用飞书项目知识 MCP 检索目标点位可用的 JSSDK API、场景、注意事项；若未配置 MCP，提示用户前往 `{siteDomain}/openapp/mcp/docs` 获取配置 URL（`siteDomain` 从 `./plugin.config.json` 读取）
+**P2.0 前置 — MCP 调用协议**
+
+调 MCP（查能力）前后均按 `meego-shared/SKILL.md` 的"MCP State 文件"段处置（前置 gate + 后置反向自愈 + 强制阻塞话术）。本处不复制分派表。
+
+**本 skill 专属后置降级约束**：若 state gate 通过后 MCP 仍无法给出有效代码示例（空结果 / 不相关片段），MUST 按本文 P3 的"代码无源即停"模板停下问用户（跳过某 API 占 TODO / 用户提供示例代码 / 换关键词），**禁止**仅凭 AI 经验脑补 `window.JSSDK.xxx` 调用。
+
+**若 gate 通过，继续下方：**
+
+1. **查能力**：用飞书项目知识 MCP 检索目标点位可用的 JSSDK API、场景、注意事项
 2. **查签名**：读取 `node_modules/@lark-project/js-sdk/dist/types/index.d.ts`，以精确类型为准写代码，不可凭 MCP 示例推断参数结构
 <!-- TODO(lark-project): 调试完成后启用
 3. **查实例数据**：若代码中需要真实的工作项/视图/空间 ID 或字段值，通过 `lark-project` skill 查询，禁止从对话上下文或 schema 脑补

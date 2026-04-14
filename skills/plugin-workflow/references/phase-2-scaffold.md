@@ -14,9 +14,22 @@
 调用 /env-setup
 ```
 
-**判断逻辑：**
-- `npx @byted-meego/cli@builder --version` 正常 + `~/.lpm/auth.json` Token 有效 → 跳过
-- 否则 → 执行 env-setup 完整流程
+**判断逻辑（三档，跳过粒度精确到各段）：**
+
+读三个信号：
+1. CLI 可用（`npx @byted-meego/cli@builder --version` 正常）
+2. Token 有效（`~/.lpm/auth.json` 当前 siteDomain 下有 `developerToken` 或未过期的 `accessToken`）
+3. MCP state（`<project-root>/.meego-state.json`）——不仅看 `feishuKnowledgeMcp == "loaded"`，还 MUST 校验 `state.siteDomain === plugin.config.json.siteDomain`（跨站时 loaded 不可信）
+
+| CLI + Token | MCP state | 动作 |
+|---|---|---|
+| 都有效 | `feishuKnowledgeMcp == "loaded"` **且** siteDomain 匹配 | **完全跳过 env-setup** |
+| 都有效 | 文件缺失 / 字段非法 / 非 `loaded` / siteDomain 不匹配 | **只跑 S3**（S1/S2 跳过，S3 探测 + 落盘 state） |
+| 任一缺失 | 任意 | **完整跑 S1 + S2 + S3** |
+
+> ⚠️ 任何情况下都不允许"CLI + Token 有效就整块跳过 env-setup"。`loaded` + siteDomain 匹配才是跳过 S3 的唯一凭据；state 文件缺失、字段非法、跨站（siteDomain 不匹配）都视为"从未在当前站点探测过"，必须回 S3 补。
+
+> ⚠️ **三信号独立判定（禁止短路）**：CLI / Token / MCP state 是三个**互相独立**的信号，必须分别判定再查上表组合。禁止用任一信号代替其他（如"state 缺失所以肯定是新工程，Token 大概也要重新授权"这类合并推断）。也禁止把"state 缺失"归入"任一缺失"档从而额外重跑 S1/S2。
 
 > 如果 env-setup 过程中获取了 siteDomain（从 URL 解析或 plugin.config.json），记录下来供后续使用。
 
@@ -37,7 +50,11 @@
 
 **产出：** `plugin.config.json` + 工程目录
 
-**Checkpoint 更新**：create 成功后将 `context.pluginId` 和 `context.siteDomain` 写入 checkpoint。
+**CRITICAL — plugin-create 成功后 MUST 切 cwd 到新工程目录，再继续后续步骤**。原因：`.meego-state.json` 的项目根算法是"向上搜第一个含 `plugin.config.json` 的目录"，若 cwd 仍在父目录，2.3/2.4 以及后续 env-setup 重入时都会搜不到项目根，state 永远不落盘，用户拿不到 `loaded` 凭据。
+
+若未切 cwd（例如用户在上层目录继续），env-setup 会发出"当前目录链上未找到 plugin.config.json"告警——此时 MUST 先 `cd <新工程目录>` 再重新触发 env-setup，不得忽略告警继续往下跑。
+
+**Checkpoint 更新**：create 成功后将 `context.pluginId`、`context.siteDomain`、`context.projectRoot`（新工程绝对路径）写入 checkpoint。
 
 ## 2.3 拉取 Schema + 确认点位
 

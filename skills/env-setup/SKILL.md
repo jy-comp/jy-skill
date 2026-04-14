@@ -23,15 +23,20 @@ S1 → 检查 CLI 可用性（npx @byted-meego/cli@builder --version）
 S2 → 检查授权 Token（~/.lpm/auth.json）
      ├─ Token 有效 → 继续 S3
      └─ Token 缺失/过期 → Auth Guard（Device Code 授权）→ 继续 S3
-S3 → 飞书项目知识 MCP（与 CLI / Token 一致的 soft 校验）
-     ├─ S3a 探测（ASK + VERIFY 二段）已加载 → 完成
-     └─ 未加载 → S3b 派子 agent 安装
-                  ├─ 装成功 → 提示用户重启会话后重跑（装好的 MCP 当前会话物理上看不到）
-                  ├─ 装失败 → 提示故障原因 + 手工补救建议
-                  └─ host 不支持 → 提示切换 host
+S3 → 飞书项目知识 MCP（探测 MUST / hard error；结果对下游 soft）
+     ├─ S3a-pre 读现有 state 短路
+     │    ├─ installed_pending_restart → 只跑 VERIFY，禁止重装（防循环）
+     │    │    ├─ VERIFY 通过 → 写 state → 完成
+     │    │    └─ VERIFY 失败 → 保留 state，再次提示重启
+     │    ├─ loaded → 只跑 VERIFY，禁止重装
+     │    │    ├─ VERIFY 通过 → 保留 state
+     │    │    └─ VERIFY 失败 → 写 state=absent + 告知用户（不自动派 S3b）
+     │    └─ absent / 缺失 / unchecked → 进 S3a 完整流程
+     ├─ S3a 探测（ASK + VERIFY 二段）已加载 → 写 state → 完成
+     └─ 未加载 → S3b 派子 agent 安装 → 按 status 写 state
 ```
 
-> **校验原则**：与 env-setup 现有 CLI / Token 检查保持一致——**soft 校验**（检测 + 提示），不写 checkpoint、不强制阻断下游。MCP 缺失时 AI 仍可基于 schema 推断，效果次优但不死。
+> **语义权威定义见 `../meego-shared/SKILL.md`** 的"飞书项目知识 MCP"段 + "MCP State 文件"段。本 SKILL.md 不重复 AI-facing / User-facing 二元约束，也不重复 state schema —— 以 meego-shared 为唯一源。
 >
 > ⚠️ **平台无关**：本 skill 不绑定 Claude Code，AI agent（Claude Code / Cursor / Cline / Continue / Gemini CLI / Copilot CLI / 其他）应自行判断 host 类型，按各自的 MCP 注册机制完成安装。详见 `references/setup.md`。
 

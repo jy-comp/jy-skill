@@ -14,6 +14,24 @@ npx @byted-meego/cli@builder local-config get > plugin.temp.local-remote.json
 
 ## P2：识别操作类型和点位类型
 
+### P2.0：MCP 调用协议（前置 gate + 后置兜底）
+
+调 MCP 工具（如 `search_meegle_plugin_docs`）的**前后**都按"无源即停"处置，**一段协议收口**：
+
+**前置**：调用前 MUST 读 `<project-root>/.meego-state.json` 按状态分派——完整分派表、siteDomain 校验、反向自愈、强制阻塞语义，**全部**见 `meego-shared/SKILL.md` 的"MCP State 文件"段。本处不重复。
+
+**后置**（MCP 返回后视为"无合法信息源"的情形）：
+- `tool not found` / `InputValidationError`（MCP 断链） → 触发反向自愈（见 meego-shared），state 回写 `absent`
+- 调用超时 / 401 / 403 → 同上
+- 返回空结果 / 明显无关片段 / 覆盖不全 → 按"无源即停"停下问用户，state 保持 `loaded`（是结果问题不是工具问题）
+
+**本 skill 专属的禁止降级动作**（通用"无源即停"在点位配置场景的落地）：
+- ❌ 用 `point-schema.json` 的字段名 / 枚举值脑补业务含义（schema 只告字段形状，不告字段语义）
+- ❌ 凭 AI 内置经验类比（"通常 work_item_type 的 key 大概就是 xxx"）
+- ❌ 沉默继续 + 挑一个"看起来合理"的值
+
+### P2.1：识别点位类型
+
 结合以下信息综合判断：
 - 用户的原始描述（添加/修改/删除）
 - 飞书项目知识 MCP（查询 work_item_type 枚举值、event_type 编号等业务背景）
