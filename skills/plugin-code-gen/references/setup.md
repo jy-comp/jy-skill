@@ -26,5 +26,5 @@ npx @byted-meego/cli@builder update
 
 ```
 ✅ 沙盒 Session 存活
-✅ 点位配置就绪（N 个点位，类型：board/dashboard/...）
+✅ 点位配置就绪（N 个点位，类型：page/dashboard/...）
 ```

@@ -13,18 +13,27 @@ metadata:
 
 # 环境准备 Skill
 
-**CRITICAL — 开始前 MUST 先用 Read 工具读取 [`../meego-shared/SKILL.md`](../meego-shared/SKILL.md)，其中包含认证、安全规则等公共约定。**
+**CRITICAL — 开始前 MUST 先用 Read 工具读取 [`../meego-shared/SKILL.md`](../meego-shared/SKILL.md)，其中包含认证、安全规则（含禁止修改 `.lpm/` 目录）、工具职责划分等公共约定。**
 **CRITICAL — 执行前务必先用 Read 工具读取 [`references/setup.md`](references/setup.md)，禁止直接盲目执行。**
-**CRITICAL — 禁止修改 `.lpm/` 目录下的任何文件，该目录由 CLI 内部管理，只能通过 CLI 命令间接操作。**
 
 ## 核心流程
 
 ```
 S1 → 检查 CLI 可用性（npx @byted-meego/cli@builder --version）
 S2 → 检查授权 Token（~/.lpm/auth.json）
-     ├─ Token 有效 → 完成
-     └─ Token 缺失/过期 → Auth Guard（Device Code 授权）
+     ├─ Token 有效 → 继续 S3
+     └─ Token 缺失/过期 → Auth Guard（Device Code 授权）→ 继续 S3
+S3 → 飞书项目知识 MCP（与 CLI / Token 一致的 soft 校验）
+     ├─ S3a 探测（ASK + VERIFY 二段）已加载 → 完成
+     └─ 未加载 → S3b 派子 agent 安装
+                  ├─ 装成功 → 提示用户重启会话后重跑（装好的 MCP 当前会话物理上看不到）
+                  ├─ 装失败 → 提示故障原因 + 手工补救建议
+                  └─ host 不支持 → 提示切换 host
 ```
+
+> **校验原则**：与 env-setup 现有 CLI / Token 检查保持一致——**soft 校验**（检测 + 提示），不写 checkpoint、不强制阻断下游。MCP 缺失时 AI 仍可基于 schema 推断，效果次优但不死。
+>
+> ⚠️ **平台无关**：本 skill 不绑定 Claude Code，AI agent（Claude Code / Cursor / Cline / Continue / Gemini CLI / Copilot CLI / 其他）应自行判断 host 类型，按各自的 MCP 注册机制完成安装。详见 `references/setup.md`。
 
 ## Auth Guard
 

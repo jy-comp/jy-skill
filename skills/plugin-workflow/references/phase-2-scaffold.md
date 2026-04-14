@@ -64,14 +64,14 @@ npx @byted-meego/cli@builder schema > point-schema.yaml
 
 **完全基于 `point-schema.yaml` 的实际内容进行分析推荐。** 不要依赖任何硬编码的点位类型假设——schema 是唯一真实来源，点位类型和字段约束可能随版本变化。
 
-**防幻觉约束：** 向用户展示的点位名称和描述**必须直接引用 schema 中的原文**，禁止自行编造点位描述（如不能把 board 称为"导航位"，除非 schema 中确实这样描述）。
+**防幻觉约束：** 向用户展示的点位名称和描述**必须直接引用 schema 中的原文**，禁止自行编造点位描述（如不能把 page 称为"导航位"，除非 schema 中确实这样描述）。
 
 AI 需要：
 1. 解析 schema 中所有可用的点位类型及其描述
 2. 结合用户的功能需求，匹配最合适的点位类型
 3. 一个功能可能需要**多个独立点位**配合（如展示 + 配置）
 
-> **⚠️ 每种点位类型是独立的顶层概念，不能嵌套。** 例如用户需要"轻应用 + 拓展字段"时，应推荐 `component` 和 `field_template` 两个独立点位，而不是把 field_template 作为 component 或 builder_comp 的属性。同理，"控件"是独立的 `control` 点位，不是某个点位的子配置。
+> **⚠️ 每种点位类型是独立的顶层概念，不能嵌套。** 例如用户需要"轻应用 + 拓展字段"时，应推荐 `component` 和 `customField` 两个独立点位，而不是把 customField 作为 component 或 liteAppComponent 的属性。同理，"控件"是独立的 `control` 点位，不是某个点位的子配置。
 
 → 进入 2.3.3 向用户确认。
 
@@ -122,7 +122,7 @@ meego-point-config 内部的 CLI 命令执行顺序和 checkpoint 更新：
 ```
 ✅ 插件工程搭建完成
    pluginId: PL_xxxxxxxxx
-   点位：[board] 需求图谱看板 / [dashboard] 关联需求标签页
+   点位：[page] 需求图谱看板 / [dashboard] 关联需求标签页
    下一步：正在为你生成代码...
 ```
 

@@ -13,16 +13,15 @@ metadata:
 
 # plugin-polish Skill
 
-**CRITICAL — 开始前 MUST 先用 Read 工具读取 [`../meego-shared/SKILL.md`](../meego-shared/SKILL.md)，其中包含认证、安全规则等公共约定。**
+**CRITICAL — 开始前 MUST 先用 Read 工具读取 [`../meego-shared/SKILL.md`](../meego-shared/SKILL.md)，其中包含认证、安全规则（含禁止修改 `.lpm/` 目录）、工具职责划分等公共约定。**
 **CRITICAL — 进入每个 mode 前，务必先用 Read 工具读取对应的 references 文档，禁止直接盲目执行。**
-**CRITICAL — 禁止修改 `.lpm/` 目录下的任何文件，该目录由 CLI 内部管理，只能通过 CLI 命令间接操作。**
 
 ## 核心理念
 
 **在功��实现之后填充基本信息，AI 能基于实际代码生成高质量的描述。**
 
 此时 AI 已经知道：
-- 插件配置了哪些点位（board/view/dashboard/button/...）
+- 插件配置了哪些点位（page/view/dashboard/button/...）
 - 每个点位的名���和功能描述
 - 代码实际实现了什么逻辑
 
@@ -71,6 +70,4 @@ mode=pipeline（默认）→ analyze → generate → confirm → apply
 - 详情描述（多段纯文本，CLI 自动转富文本）
 - 分类（从列表中选择）
 
-## 前置依赖
-
-- plugin-code-gen skill 已执行，代码文件已就绪
+> 前置依赖链由 `plugin-workflow` 统一维护（... → plugin-code-gen → plugin-polish → plugin-publish）。

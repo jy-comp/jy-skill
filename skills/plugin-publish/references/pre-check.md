@@ -14,6 +14,28 @@ GET /sandbox/sessions/:id/files?path=plugin.config.json
 
 若 resources 为空 → 提示：`请先完成代码生成（plugin-code-gen skill）`
 
+## PC1.5：Runtime URL 占位符硬阻止（CRITICAL — 上线前不可跳过）
+
+发布前对 `point.config.local.json` 做最后一道 **Runtime URL** 真实性扫描，完全复用 `meego-point-config/references/apply.md` 的 **A0.5 扫描规则**（扫描范围、可疑模式、触发条件同步维护，以 A0.5 为准）——涵盖：
+
+- 顶层：`intercept.url` / `listen_event.url` / `control.url`
+- 数据接口：`control.table_url.url`（当 table_cell 声明了变量）/ `customField.table_data_url`（当 table_layout 声明了变量）
+- DSL 节点：任意 `onClick/onDoubleClick.params.url`（`action=httpRequest` 或字面量 `openLink`）
+
+**与 A0.5 的关系**：规则完全一致，两处均为硬阻止、不提供绕过选项。PC1.5 作为 publish 阶段的二道防线，防止配置推送到后台后被手动改出占位 URL。
+
+**输出示例**：
+```
+🔴 发布终止：以下 URL 仍是占位符，上线后对应功能会失败：
+- intercept[intercept_abc]: url = https://example.com/callback
+- control[control_xxx]: table_url.url = https://PLACEHOLDER.invalid/...
+- control[control_yyy] table_cell 里某 httpRequest 节点: params.url = https://your-api/submit
+
+请先在 meego-point-config 中补齐真实 URL，重新 push 远端，再重试 publish。
+```
+
+**恢复路径**：用户替换为真实 URL → 通过 `meego-point-config` 重新推送（会再经过 A0.5 检查，这次 URL 真实故通过） → 回到 `plugin-publish` 重试，此时 PC1.5 扫描通过，发布继续。
+
 ## PC2：执行 tsc --noEmit
 
 ```bash

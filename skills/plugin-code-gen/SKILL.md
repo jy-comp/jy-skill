@@ -13,9 +13,9 @@ metadata:
 
 # plugin-code-gen Skill
 
-**CRITICAL — 开始前 MUST 先用 Read 工具读取 [`../meego-shared/SKILL.md`](../meego-shared/SKILL.md)，其中包含认证、安全规则等公共约定。**
+**CRITICAL — 开始前 MUST 先用 Read 工具读取 [`../meego-shared/SKILL.md`](../meego-shared/SKILL.md)，其中包含认证、安全规则（含禁止修改 `.lpm/` 目录、无源即停通则）、工具职责划分（飞书项目知识 MCP vs lark-project skill vs CLI schema）等公共约定。**
 **CRITICAL — 进入每个 mode 前，务必先用 Read 工具读取对应的 references 文档，禁止直接盲目执行。**
-**CRITICAL — 禁止修改 `.lpm/` 目录下的任何文件，该目录由 CLI 内部管理，只能通过 CLI 命令间接操作。**
+**CRITICAL — 代码溯源协议（承袭 meego-shared 的"无源即停"通则）：每行 SDK 调用必须能追溯到合法信息源（飞书项目知识 MCP 示例 / @lark-project/js-sdk 类型定义 / 用户提供的代码）；工作项/视图等实例数据必须通过 `lark-project` skill 查询，不得从 schema 或对话上下文脑补。找不到合法信息源时必须停下询问用户。详见 [`references/plan.md`](references/plan.md) 的"代码溯源协议"章节，apply 阶段会派 reviewer subagent 强制审计。**
 
 ## 核心流程
 
@@ -85,7 +85,7 @@ mode=pipeline（默认）→ setup → plan → apply → verify
 |------|------|---------|
 | L1 预检 | `tsc --noEmit` 语法检查（约 10s） | verify 阶段必须执行 |
 | L2 自动修复 | AI 读取错误 → 生成 patch → 重试（最多 2 轮） | L1 发现错误时 |
-| L3 降级兜底 | 提供 zip 下载 + 本地调试指引 | L2 仍失败时 |
+| L3 降级兜底 | 提供 zip 下载 + 本地调试指引；**禁止清理 `.plugin-workflow-state.json` 及 `.lpm/`**，降级不等于中止流程，断点须保留供用户后续从本地修复后继续 | L2 仍失败时 |
 
 ## 本地调试引导
 

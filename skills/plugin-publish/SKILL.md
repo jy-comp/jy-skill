@@ -13,9 +13,8 @@ metadata:
 
 # plugin-publish Skill
 
-**CRITICAL — 开始前 MUST 先用 Read 工具读取 [`../meego-shared/SKILL.md`](../meego-shared/SKILL.md)，其中包含认证、安全规则等公共约定。**
+**CRITICAL — 开始前 MUST 先用 Read 工具读取 [`../meego-shared/SKILL.md`](../meego-shared/SKILL.md)，其中包含认证、安全规则（含禁止修改 `.lpm/` 目录、禁止编造 URL）、工具职责划分等公共约定。**
 **CRITICAL — 进入每个 mode 前，务必先用 Read 工具读取对应的 references 文档，禁止直接盲目执行。**
-**CRITICAL — 禁止修改 `.lpm/` 目录下的任何文件，该目录由 CLI 内部管理，只能通过 CLI 命令间接操作。**
 
 ## 核心流程
 
@@ -74,7 +73,7 @@ npx @byted-meego/cli@builder publish \
   --desc-zh <版本描述>             # AI 自动基于改动总结生成
   --product-version <产物版本>     # 必填，来自 release 输出
   --store <publish|no-publish>    # 可选，是否发布到插件商店，默认 no-publish
-  --upgrade <manual|all|limit>    # 可选，升级策略，默认 manual
+  --upgrade <manual|all|limit>    # 可选，CLI 默认 manual；AI 一律不主动传，仅当用户明确要求"自动升级全部/按范围升级"时才传 all/limit
 ```
 
 ## 输出产物

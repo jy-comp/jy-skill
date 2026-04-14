@@ -59,7 +59,7 @@ npx tsc --noEmit
 ⚠️ 代码存在语法错误，AI 自动修复未能完全解决。
 
 错误详情：
-  • src/features/board/main/index.tsx:12 - 类型 'string' 不可分配给类型 'number'
+  • src/features/page/main/index.tsx:12 - 类型 'string' 不可分配给类型 'number'
   • ...
 
 建议：

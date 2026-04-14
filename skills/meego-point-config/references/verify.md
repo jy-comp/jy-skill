@@ -20,7 +20,7 @@ npx @byted-meego/cli@builder local-config get --remote
 
 ```
 ✅ 远端配置验证通过
-   board: 2 个点位
+   page: 2 个点位
    view: 1 个点位
    ...
 ```
@@ -29,7 +29,7 @@ npx @byted-meego/cli@builder local-config get --remote
 
 ```
 ❌ 远端配置验证失败
-   预期的 board[test_board_v1] 未在远端找到
+   预期的 page[test_board_v1] 未在远端找到
 ```
 
 处理：

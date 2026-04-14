@@ -14,9 +14,8 @@ metadata:
 
 # Meego 点位配置管理 Skill
 
-**CRITICAL — 开始前 MUST 先用 Read 工具读取 [`../meego-shared/SKILL.md`](../meego-shared/SKILL.md)，其中包含认证、安全规则等公共约定。**
+**CRITICAL — 开始前 MUST 先用 Read 工具读取 [`../meego-shared/SKILL.md`](../meego-shared/SKILL.md)，其中包含认证、安全规则（含禁止修改 `.lpm/` 目录、删除点位须确认、禁止编造 URL）、工具职责划分等公共约定。**
 **CRITICAL — 进入每个 mode 前，务必先用 Read 工具读取对应的 references 文档，禁止直接盲目执行。**
-**CRITICAL — 禁止修改 `.lpm/` 目录下的任何文件，该目录由 CLI 内部管理，只能通过 CLI 命令间接操作。**
 
 ## 核心流程
 
@@ -31,29 +30,24 @@ mode=pipeline（默认）→ setup → plan → apply → verify
 ## 点位类型速查
 
 > **每种点位类型是彼此独立的顶层概念，不能将一种点位当作另一种点位的属性或子配置。**
-> 例如：`field_template`（拓展字段）是独立点位，不是 `builder_comp` 或 `component` 的属性；`control`（控件）也是独立点位，不是 `field_template` 的一部分。
+> 例如：`customField`（拓展字段）是独立点位，不是 `liteAppComponent` 或 `component` 的属性；`control`（控件）也是独立点位，不是 `customField` 的一部分。
 > config JSON 中每种类型各自一个顶层数组，互不嵌套。
 
-| 类型 | 必填字段 |
+| 类型 | 一句话用途 |
 |------|---------|
-| `board` | key, icon(JSON格式), name(max 15字符) |
-| `view` | key, icon(预定义枚举), name(max 15字符), work_item_type |
-| `dashboard` | key, name(max 15字符) |
-| `config` | key |
-| `control` | key, name(max 100字符), work_item_type |
-| `button` | key, name(max 15字符), work_item_type |
-| `intercept` | key, name(max 15字符), url, token, event_config(min 1条) |
-| `listen_event` | url, token, event_config(min 1条)；key 可选 |
-| `component` | key, component_type（以 schema 为准，目前支持轻应用） |
-| `field_template` | key, i18n_info, subfield(min 1条), platform |
-| `builder_comp` | key, icon_url, i18n_info, properties, platform |
+| `page` | 顶部导航扩展页 |
+| `view` | 工作项列表自定义视图 |
+| `dashboard` | 独立仪表盘页 |
+| `config` | 插件级配置入口 |
+| `control` | 工作项详情页的自定义控件（表单字段/展示块） |
+| `button` | 工作项详情页的自定义按钮 |
+| `intercept` | 状态流转拦截器（同步返回放行/拒绝） |
+| `listen_event` | 工作项事件异步监听（创建/更新/状态变更等） |
+| `component` | 通用组件位（目前支持轻应用） |
+| `customField` | 扩展字段（列表/表单展示 + 数据接口） |
+| `liteAppComponent` | 轻应用组件（搭建器拖拽组件） |
 
-**关键约束（来自表单分析）：**
-- `board.icon`：JSON 格式，如 `{"color":"#B449C2","type":"work_object_icon_version"}`
-- `view.icon`：预定义枚举 `icon-openapp_view_chart/flow/pie/pie2/line/graph/ecg`
-- `mobile_block_style`：枚举 `not_display | small | medium | big`
-- `field_template.subfield.field_type`：枚举 `multi-pure-text | tree-multi-select | number | multi-user | precise_date`
-- `button.platform.web.mode`：枚举 `ui | script`
+> **必填字段 / 长度 / 枚举合法性以 `npx @byted-meego/cli@builder schema` 输出为准**，由 `local-config set` 强制校验，本表不再镜像——避免 schema 迭代后漂移。schema 抓不到的行为指引（URL 询问、MCP 强制查询、派生字段规则等）见 `references/plan.md` 的"各类型的行为指引"节。
 
 ## 使用方式
 
@@ -101,27 +95,22 @@ mode=pipeline（默认）→ setup → plan → apply → verify
 3. 将修改后的**完整配置**提交（包含所有点位类型、所有点位实例）
 4. 推送成功后执行 `npx @byted-meego/cli@builder update` 将远端配置同步回本地
 
-**删除操作须用户确认（CRITICAL — 适用于所有阶段、所有调用路径，不可跳过）：**
-- 在执行 `local-config set` 之前，**MUST** 先用 `local-config get --remote` 获取远端配置，逐类型、逐 key 对比即将提交的 JSON
-- 当提交的 JSON 相比远端**减少了**点位（无论是删除某个点位实例还是整个类型），**必须立即暂停，向用户列出即将被删除的点位清单（类型 + key + name），获得明确确认后才能执行 set**
-- 禁止静默删除——即使用户只说"修改 X"或"替换 X 为 Y"，如果生成的 JSON 意外少了其他点位，也必须中止并提醒
-- **此规则在 apply 阶段强制执行 diff 检查（见 apply.md 的 A0 步骤），即使 plan 阶段已确认过也须再次检查**
+> **删除点位须用户确认**：规则定义在 [`../meego-shared/SKILL.md`](../meego-shared/SKILL.md) 的"删除点位确认"条款，适用于所有阶段和调用路径。本 skill 在 apply 阶段通过 [`references/apply.md`](references/apply.md) 的 A0 步骤强制执行 diff 检查——即使 plan 阶段已确认过，也须再次检查（文件可能被手改）。
 
 **严禁以下行为：**
 - 只传变更部分（会导致未传的点位被删除）
-- 不经确认删除任何已有点位
 - 直接修改 `plugin.config.json`（始终通过 CLI 命令同步）
 
 ### 增/改/删操作模式
 
 假设远端当前配置为：
 ```json
-{ "board": [{ "key": "board_abc123", ... }], "button": [{ "key": "button_x1", ... }, { "key": "button_x2", ... }] }
+{ "page": [{ "key": "board_abc123", ... }], "button": [{ "key": "button_x1", ... }, { "key": "button_x2", ... }] }
 ```
 
 | 操作 | set 的 JSON 内容 | 说明 |
 |------|-----------------|------|
-| **新增** builder_comp | `{ "board": [原样保留], "button": [原样保留], "builder_comp": [新点位] }` | 必须带上 board 和 button，否则它们会被删除 |
-| **修改** button_x1 的 name | `{ "board": [原样保留], "button": [{ "key": "button_x1", name已改, ... }, { "key": "button_x2", 原样 }] }` | 只改目标字段，其余字段和其他点位原样保留 |
-| **删除** button_x2 | `{ "board": [原样保留], "button": [{ "key": "button_x1", 原样 }] }` | 从数组中移除目标项，其余原样保留 |
-| **删除整个** button 类型 | `{ "board": [原样保留] }` | 不传 button 字段，远端 button 即被清除 |
+| **新增** liteAppComponent | `{ "page": [原样保留], "button": [原样保留], "liteAppComponent": [新点位] }` | 必须带上 page 和 button，否则它们会被删除 |
+| **修改** button_x1 的 name | `{ "page": [原样保留], "button": [{ "key": "button_x1", name已改, ... }, { "key": "button_x2", 原样 }] }` | 只改目标字段，其余字段和其他点位原样保留 |
+| **删除** button_x2 | `{ "page": [原样保留], "button": [{ "key": "button_x1", 原样 }] }` | 从数组中移除目标项，其余原样保留 |
+| **删除整个** button 类型 | `{ "page": [原样保留] }` | 不传 button 字段，远端 button 即被清除 |

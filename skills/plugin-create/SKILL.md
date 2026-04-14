@@ -14,9 +14,8 @@ metadata:
 
 # plugin-create Skill
 
-**CRITICAL — 开始前 MUST 先用 Read 工具读取 [`../meego-shared/SKILL.md`](../meego-shared/SKILL.md)，其中包含认证、安全规则等公共约定。**
+**CRITICAL — 开始前 MUST 先用 Read 工具读取 [`../meego-shared/SKILL.md`](../meego-shared/SKILL.md)，其中包含认证、安全规则（含禁止修改 `.lpm/` 目录）、工具职责划分等公共约定。**
 **CRITICAL — 进入每个 mode 前，务必先用 Read 工具读取对应的 references 文档，禁止直接盲目执行。**
-**CRITICAL — 禁止修改 `.lpm/` 目录下的任何文件，该目录由 CLI 内部管理，只能通过 CLI 命令间接操作。**
 
 ## 核心理念
 
@@ -69,6 +68,4 @@ plugin-create → meego-point-config → plugin-code-gen → plugin-polish → p
                                                           生成名称/描述/分类
 ```
 
-## 前置依赖
-
-- env-setup skill 已执行（CLI 可用、Token 已配置）
+> 前置依赖链由 `plugin-workflow` 统一维护（env-setup → plugin-create → ...），独立调用时 AI 自行判断是否需要先跑 `env-setup`。

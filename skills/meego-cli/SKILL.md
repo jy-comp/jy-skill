@@ -17,21 +17,13 @@ metadata:
 
 # Meego 插件 CLI 原子化命令参考 & 诊断工具
 
-**CRITICAL — 开始前 MUST 先用 Read 工具读取 [`../meego-shared/SKILL.md`](../meego-shared/SKILL.md)，其中包含认证、安全规则、插件工程识别等公共约定。**
-**CRITICAL — 禁止修改 `.lpm/` 目录下的任何文件，该目录由 CLI 内部管理，只能通过 CLI 命令间接操作。**
+**CRITICAL — 开始前 MUST 先用 Read 工具读取 [`../meego-shared/SKILL.md`](../meego-shared/SKILL.md)，其中包含认证、安全规则（含禁止修改 `.lpm/` 目录、禁止编造 URL、删除点位须确认）、插件工程识别、工具职责划分等公共约定。**
 
 ## 项目上下文感知
 
-使用本 skill 前，**MUST** 先确认当前处于插件工程目录：
+使用本 skill 前，**MUST** 按 [`../meego-shared/SKILL.md`](../meego-shared/SKILL.md) 的"插件工程识别"规则确认当前处于插件工程目录（存在 `plugin.config.json` 且含 `MII_` 前缀的 `pluginId`）。识别通过后，`siteDomain` / `pluginId` / `resources` 由 CLI 自动读取，无需手动传参。
 
-1. **检查**：读取当前目录的 `plugin.config.json`
-2. **验证**：确认含有 `pluginId`（以 `MII_` 开头）
-3. **提取上下文**：
-   - `siteDomain` — CLI 命令自动读取，无需手动传参
-   - `pluginId` — 插件标识
-   - `resources` — 已配置的点位资源列表（`id` 前缀反映点位类型，如 `board_web_`、`button_web_`）
-
-如果 `plugin.config.json` 不存在或无 `pluginId`，则当前不是插件目录，需要先 `create` 或 `cd` 到插件目录。
+不在插件目录时，引导用户先 `create` 或 `cd` 到插件目录。
 
 ---
 
@@ -93,8 +85,8 @@ metadata:
 | 条件组合 | 状态 | 建议操作 |
 |---------|------|---------|
 | 无 `plugin.config.json` | 非插件目录 | `create` 创建插件或 `cd` 到插件目录 |
-| 有 config，`resources` 为空 | 已创建，未配置点位 | → `/meego-point-config` 配置点位 |
-| 有 config，`resources` 非空，无 `src/features/` | 已配置，未生成代码 | → `/plugin-code-gen` 生成代码 |
+| 有 `plugin.config.json`，`resources` 为空 | 已创建，未配置点位 | → `/meego-point-config` 配置点位 |
+| 有 `plugin.config.json`，`resources` 非空，无 `src/features/` | 已配置，未生成代码 | → `/plugin-code-gen` 生成代码 |
 | 有 `src/features/` 但代码为模板 | 已生成模板，未实现功能 | → `/plugin-code-gen mode=apply` 填充功能 |
 | 有 `src/features/` 且代码已实现 | 可调试或发布 | `start --auto` 调试 或 → `/plugin-publish` 发布 |
 | `.plugin-workflow-state.json` 存在 | workflow 中断 | 展示上次进度，引导继续（详见 checkpoint 恢复） |
@@ -107,7 +99,8 @@ metadata:
    站点：https://meego.feishu-boe.cn
    点位资源：3 个（board_web × 1, button_web × 1, control_web × 1）
    代码状态：已实现（src/features/ 下 3 个目录）
-   上次进度：Phase 3 — 本地调试中（来自 checkpoint）
+   上次进度：Phase {phase} — {stepName}（来自 .plugin-workflow-state.json；字段定义见 plugin-workflow/SKILL.md 的"Checkpoint 文件格式"）
+   最近命令：{lastCommand} → {lastCommandStatus}
    
    建议：运行 `npx @byted-meego/cli@builder start --auto` 继续调试
 ```
@@ -132,7 +125,7 @@ metadata:
    - FeatureContext 字段不存在（各点位 context 字段不同，参考 `@lark-project/js-sdk` 类型定义）
    - union type 直接解构不安全（如 `ButtonFeatureContext` 需先判断 scene）
    - Control 和 CustomField API 混用（如在控件代码中调用 `customField.getProps()`）
-   - **排查方式**：传参和返回值以 `node_modules/@lark-project/js-sdk/dist/types/index.d.ts` 为准；查 API 能力可走飞书知识 MCP 或直接读包
+   - **排查方式**：传参和返回值以 `node_modules/@lark-project/js-sdk/dist/types/index.d.ts` 为准；查 API 能力可走飞书项目知识 MCP 
 3. 可使用 `/plugin-code-gen mode=verify` 让 AI 自动修复（最多 2 轮）
 
 ### "能回退版本吗" / "撤销发布"
@@ -269,7 +262,7 @@ npx @byted-meego/cli@builder publish \
 | `--desc-zh` | 是 | 版本描述（中文） |
 | `--version` | 否 | 语义化版本号，不传则自动 patch +1 |
 | `--store` | 否 | `publish`（发布到商店）/ `no-publish`（默认，仅内部） |
-| `--upgrade` | 否 | `manual`（默认）/ `all`（自动升级所有安装）/ `limit` |
+| `--upgrade` | 否 | CLI 默认 `manual`；AI 不主动传，仅当用户明确要求 `all`（自动升级所有安装）/ `limit`（按范围）时才显式传 |
 
 **关键**：`--product-version` 必须从 `release` 的 stdout 中提取（正则：`/Product version: (\S+)/`），不可编造。
 
@@ -306,7 +299,7 @@ npx @byted-meego/cli@builder local-config get --remote
 npx @byted-meego/cli@builder local-config set --config '<完整 JSON>'
 ```
 
-**全量替换语义（CRITICAL）**：`local-config set` 是**全量覆盖**，必须传完整配置（所有点位），不能只传变更部分。遗漏任何现有点位都会导致该点位被永久删除。
+**全量替换语义（CRITICAL）**：`local-config set` 是**全量覆盖**，必须传完整配置（所有点位），不能只传变更部分。遗漏任何现有点位都会导致该点位被永久删除。详见 [`../meego-shared/SKILL.md`](../meego-shared/SKILL.md) 的"全量提交约束"与"删除点位确认"条款。
 
 **典型流程**：
 1. `local-config get --remote` → 获取远端当前完整配置
@@ -315,7 +308,7 @@ npx @byted-meego/cli@builder local-config set --config '<完整 JSON>'
 4. `update --source-type=local` → 推送到远端
 5. `update` → 拉取远端配置同步回本地
 
-**删除确认（CRITICAL — 不可跳过）**：在执行 `local-config set` 之前，**MUST** 先对比提交的 JSON 与远端配置（`local-config get --remote`）。如果提交的 JSON 相比远端减少了任何点位（整个类型缺失或某个 key 缺失），**必须立即暂停**，向用户列出将被删除的点位清单（类型 + key + name）并获得明确确认，禁止静默删除。此规则适用于所有调用路径。
+**删除确认**：见 [`../meego-shared/SKILL.md`](../meego-shared/SKILL.md) 的"删除点位确认"条款——`local-config set` 前必须对比远端并向用户确认任何减少的点位，此规则适用于所有调用路径（原子命令、点位编排、workflow），不可跳过。
 
 ### 生成 Schema
 

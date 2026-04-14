@@ -10,7 +10,7 @@
 ## A2：读取点位配置
 
 从 `plugin.config.json` 的 `extensions` 字段中提取每个点位的：
-- **类型**（board/view/dashboard/button/control/intercept/...）
+- **类型**（page/view/dashboard/button/control/intercept/...）
 - **名称**（i18n_info 中的 name）
 - **描述**（i18n_info 中的 description）
 - **适用的工作项类型**

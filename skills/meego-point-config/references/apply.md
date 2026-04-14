@@ -8,7 +8,8 @@
 **Checkpoint 恢复检查**（仅在 `.plugin-workflow-state.json` 存在时）：
 - `lastCommand` 含 `local-config set` + `"success"` → 跳过 A1，直接执行 A2
 - `lastCommand` 含 `update --source-type=local` + `"success"` → 跳过 A1+A2，直接执行 A3
-- `lastCommand` 含 `update` (不含 --source-type) + `"success"` → 跳过 A1+A2+A3，直接执行 A4
+- `lastCommand` 含 `update --source-type=remote` + `"success"` → 跳过 A1+A2+A3，直接执行 A4
+- （兼容老 checkpoint）`lastCommand` 含 `update`（不带 source-type，老命名）+ `"success"` → 等同 `--source-type=remote`，跳过 A1+A2+A3，直接执行 A4
 - 其他 → 从 A1 开始
 
 ## A0：Diff 检查 — 删除确认（CRITICAL — 不可跳过）
@@ -26,6 +27,61 @@
 4. 如果没有点位减少，直接继续执行 A1
 
 > **禁止跳过此步骤。** 即使 plan 阶段已经确认过删除，apply 阶段仍须再次检查——因为配置文件可能在 plan 之后被修改，或者当前 apply 并非从 plan 阶段进入。
+
+## A0.5：Runtime URL 占位符兜底 lint（CRITICAL — 不可跳过）
+
+即将提交的 JSON 里，所有 **Runtime URL**（分类定义见 `meego-shared/SKILL.md` 的"禁止编造 URL"章节）必须真实可达，否则对应功能上线后会失败。此步骤是 plan 阶段 P3 询问的防御性兜底——防止直接从 apply 入口进入绕过 plan，或配置文件在 plan 之后被手动改动。
+
+### 扫描范围（遍历提交 JSON 的所有类型）
+
+**顶层 URL 字段**：
+- `intercept[].url`
+- `listen_event[].url`
+- `control[].url`（"新建页可见" Webhook）
+
+**数据接口 URL 字段**（仅当该点位的 DSL 声明了变量时才需要真实）：
+- `control[].platform.web.table_url.url` —— 条件：`table_cell` 归一化后 `definitions.data` 非空
+- `customField[].platform.web.table_data_url` —— 条件：`table_layout` 归一化后 `definitions.data` 非空
+- **未来任何新增的、共享 `PlatformWebForControl.table_cell.dslSchema` 的点位类型** —— 扫 `platform.web.<dsl-field>.definitions.data` 与其配套 URL 字段，规则自动适用
+
+**DSL 节点 URL 字段**（扫 template 树的每个节点）：
+- `props.onClick.params.url` / `props.onDoubleClick.params.url`，当 `action` 是 `httpRequest` 或 `openLink`（字面量 URL 时）
+- 递归进入 `children[]`
+
+**`table_cell` / `table_layout` 的三种形态都要扫**：
+- 完整对象 `{definitions, template}` → 扫 template 树
+- 裸 template（顶层直接 `type`） → 扫整棵树
+- JSON 字符串 → 先 `JSON.parse` 再扫（parse 失败则跳过，让 schema 自己报错）
+
+### 触发警示的 URL 特征
+
+值匹配以下任一可疑模式（大小写不敏感）即判定为"占位符"：
+
+- `example.com` / `example.org` / `example.net`
+- `your-server` / `your-domain` / `your-api` / `your-host`
+- `placeholder` / `<placeholder`
+- `.invalid` / `.test` / `.example`（RFC 2606 保留 TLD，永远无法解析）
+- `localhost` / `127.0.0.1` / `0.0.0.0`（生产环境无法访问）
+- `mock` / `fake` / `dummy` / `foo.bar` / `sample`
+- 空字符串或仅空白（对"必填"的 Runtime URL 而言）
+
+### 处理流程
+
+1. 若发现任一可疑 URL，**立即暂停**，列出清单（按点位分组）：
+   ```
+   🔴 以下 URL 看起来是占位符，上线后对应功能会失败：
+   - intercept[intercept_abc]: url = https://example.com/callback
+   - control[control_xxx]: table_url.url = https://PLACEHOLDER.invalid/...
+     （该点位 table_cell 声明了变量：varName1, varName2）
+   - control[control_yyy].table_cell.template.children[0].props.onClick.params.url
+     = https://your-api.test/submit
+     （action=httpRequest）
+   - customField[ft_zzz]: table_data_url 缺失（table_layout 声明了变量）
+   ```
+
+2. **硬阻止，不提供绕过选项**：要求用户提供真实 URL → 修改配置后重新进入 A0。不允许"先占位、后替换"。
+
+**此步骤无论从 pipeline / plugin-workflow / 单独 apply 入口进入均须执行**。即使 plan 阶段已问过，A0.5 仍要再扫一遍——文件可能被手动改过。
 
 ## A1：Schema 校验（local-config set）
 
@@ -71,23 +127,30 @@ npx @byted-meego/cli@builder local-config set --config '<plugin.temp.local-{time
 npx @byted-meego/cli@builder update --source-type=local
 ```
 
-- 成功 → **Checkpoint**：`{ lastCommand: "update --source-type=local", lastCommandStatus: "success", nextCommand: "update", nextStep: "A3 拉取远端配置" }` → 继续执行 A3
+- 成功 → **Checkpoint**：`{ lastCommand: "update --source-type=local", lastCommandStatus: "success", nextCommand: "update --source-type=remote", nextStep: "A3 拉取远端配置" }` → 继续执行 A3
 - 失败 → **Checkpoint**：`{ lastCommand: "update --source-type=local", lastCommandStatus: "failed" }` → 报错展示，终止
 
-## A3：拉取远端配置到本地（update）
+## A3：拉取远端配置到本地（update --source-type=remote）
 
-**Checkpoint**：执行前写入 `{ nextCommand: "update", nextStep: "A3 拉取远端配置", lastCommandStatus: "running" }`
+**Checkpoint**：执行前写入 `{ nextCommand: "update --source-type=remote", nextStep: "A3 拉取远端配置", lastCommandStatus: "running" }`
 
-推送成功后，**必须**再执行一次 update 将远端配置（含模板等）同步回本地 `plugin.config.json`：
+> ⚠️ **此步骤不可跳过**。A2 的 `--source-type=local` 只**推送配置到后端**，**不会**生成 `plugin.config.json` 中的 `resources` 数组和本地 entry 模板代码——这些是后端基于配置生成的产物，必须再走一次 `--source-type=remote` 才会被 CLI 拉下来。
+>
+> 跳过 A3 的后果：plugin.config.json 中没有 resources、本地 src/ 没有对应 entry 文件，下游的 `plugin-code-gen` skill 会在第一步就找不到代码模板。
 
 ```bash
-npx @byted-meego/cli@builder update
+npx @byted-meego/cli@builder update --source-type=remote
 ```
 
-> **禁止直接修改 `plugin.config.json`。** 始终通过 `update` 命令让 CLI 自动同步，确保本地配置与远端一致。
+> **禁止直接修改 `plugin.config.json`。** 始终通过 `update --source-type=remote` 命令让 CLI 自动同步，确保本地配置与远端一致。
 
-- 成功 → **Checkpoint**：`{ lastCommand: "update", lastCommandStatus: "success", nextStep: "A4 清理临时文件" }` → 继续执行清理
-- 失败 → **Checkpoint**：`{ lastCommand: "update", lastCommandStatus: "failed" }` → 报错展示，但不影响已推送的远端配置
+A3 完成后 CLI 会做以下三件事（对照验证）：
+1. 拉取远端最新配置（含 A2 推送进去的点位）
+2. 在 `plugin.config.json.resources` 数组中补齐每个点位对应的 resource id + entry 路径
+3. 在 `src/features/<resourceId>/index.tsx` 生成模板代码
+
+- 成功 → **Checkpoint**：`{ lastCommand: "update --source-type=remote", lastCommandStatus: "success", nextStep: "A4 清理临时文件" }` → 继续执行清理
+- 失败 → **Checkpoint**：`{ lastCommand: "update --source-type=remote", lastCommandStatus: "failed" }` → 报错展示，但不影响已推送的远端配置
 
 ## A4：清理临时文件（强制）
 
@@ -101,5 +164,5 @@ rm -f plugin.temp.local-*.json
 
 ```
 ✅ 配置已成功推送至远端
-   变更：[添加/修改/删除] board[test_board_v1]
+   变更：[添加/修改/删除] page[test_board_v1]
 ```
