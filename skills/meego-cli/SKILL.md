@@ -334,41 +334,22 @@ npx @byted-meego/cli@builder list-categories [--type 0]
 
 ## 命令依赖关系
 
-```
-login ─────────────────────────────────────────── 全局认证（一次性）
-  │
-  ▼
-create ────────────────────────────────────────── 创建插件（一次性）
-  │
-  ▼
-schema ──→ local-config set ──→ update ────────── 配置点位（可随时）
-  │                                │
-  │                                ▼
-  │                            start --auto ───── 本地调试
-  │
-  ▼
-update-description ────────────────────────────── 修改基本信息（可随时）
-  │
-  ▼
-release ──→ publish ───────────────────────────── 构建发布
-```
+典型顺序（前置依赖 → 后置操作）：
+
+1. `login` — 全局认证（一次性）
+2. `create` — 创建插件工程（一次性）
+3. `schema` → `local-config set` → `update` — 配置点位（可随时）
+4. `start --auto` — 本地调试（依赖 step 3 的 `update`）
+5. `update-description` — 修改基本信息（可随时）
+6. `release` → `publish` — 构建发布（两步串行，不可跳）
 
 ## 与编排 skill 的分工
 
-```
-用户指令
-  │
-  ├─ 原子操作（"启动调试"/"构建"/"同步"/"查看配置"）
-  │     └─→ meego-cli（本 skill）→ 直接执行单条 CLI 命令
-  │
-  ├─ 编排操作（"发布"/"加点位"/"生成代码"/"改名称"）
-  │     └─→ 对应编排 skill 直接处理（plugin-publish / meego-point-config / ...）
-  │
-  ├─ 端到端需求（"做一个 xxx 功能"）
-  │     └─→ plugin-workflow 编排全流程
-  │
-  └─ 诊断查询（"什么状态"/"调试报错"）
-        └─→ meego-cli（本 skill）→ 读取状态 / 排查引导
-```
+| 用户指令类型 | 示例 | 由谁处理 |
+|------------|------|--------|
+| 原子操作 | "启动调试" / "构建" / "同步" / "查看配置" | meego-cli（本 skill）直接执行单条 CLI |
+| 编排操作 | "发布" / "加点位" / "生成代码" / "改名称" | 对应编排 skill（plugin-publish / meego-point-config / plugin-code-gen / plugin-polish） |
+| 端到端需求 | "做一个 xxx 功能" | plugin-workflow 编排全流程 |
+| 诊断查询 | "什么状态" / "调试报错" | meego-cli（本 skill）读取状态 / 排查引导 |
 
 **分工原则**：单条 CLI 命令能完成的用 meego-cli，需要多步串行/交互确认的用编排 skill。

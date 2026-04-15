@@ -1,4 +1,4 @@
-# 场景 C：消费管理员配置的属性（非 dataSource）
+# 场景 C：消费管理员配置的属性（非 dataSource / dataSet）
 
 > 前置：已读 `index.md` 的三源分工 / 冲突优先级 / propKey 来源约束。
 
@@ -90,7 +90,7 @@ off?.();   // 卸载时取消订阅
 - `watchKeys` 不传 = 监听全部可监听的 key；传了就只在指定 key 变化才触发 callback
 - callback 入参永远是**全量 nextProps**（即便限定了 watchKeys，也是给你整个 props 对象，自己挑字段用）
 
-**watch 的作用域边界**：`watch` 只订阅管理员配置的组件属性（text / number / select / viewSelect / ...）。**dataSource 类型属性不走 watch**——dataSource 的数据由独立的 `getDataSourceResult(propKey, ...)` 按需主动拉取，详见 `consume-data.md` 步骤 5。不要把 dataSource propKey 放进 `watchKeys`，也不要在 watch 回调里做 dataSource 刷新联动。
+**如果属性里有 dataSource 类型**：单纯的 watch 拿不到数据源背后的工作项列表，需要在 callback 里主动再调 `getDataSourceResult` —— 见 `consume-data.md` 步骤 5。
 
 ## 常见坑
 

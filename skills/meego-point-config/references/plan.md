@@ -183,7 +183,7 @@ page | view | dashboard | config | control | button | intercept | listen_event |
 | listen_event | `url` 必须向用户询问；`event_config` 同 intercept |
 | component | `component_type` 只能从 schema 枚举取，禁止脑补"看起来像"的值（目前仅支持轻应用） |
 | customField | URL 询问（`table_data_url` / 节点内 `httpRequest.params.url`）同 control；`subfield.name` 非必填时留空由 CLI 从 `i18n_info.zh.name` 取值，AI 不要自作主张另填 |
-| liteAppComponent | **MUST 先调飞书项目知识 MCP**（关键词 `轻应用组件 LiteAppComponent 属性 getProps notify watch 输出属性`）拉完整指南再填 properties/outputs——类型选型、数据源（spaceId → 工作项类型 → 字段）、排期不支持等限制只在 MCP 里有、schema 抓不到；【过渡期 / 模拟 RAG 用，MCP 正式上线后删除此段】MCP 未命中则 fallback 读 `log/builder-comp-rag-doc.md`；发布后 property 类型不可改，定义阶段要一次问清 |
+| liteAppComponent | **仅限本阶段填 properties/outputs 的 propType 选型 / 数据源限制**：MUST 先调飞书项目知识 MCP（关键词 `轻应用组件 LiteAppComponent 属性 getProps notify watch 输出属性`）确认 propType 枚举、spaceId → 工作项类型 → 字段结构、排期不支持等**声明端**限制（schema 抓不到）；【过渡期 / 模拟 RAG 用，MCP 正式上线后删除此段】MCP 未命中则 fallback 读 `log/builder-comp-rag-doc.md`；发布后 property 类型不可改，定义阶段要一次问清。**⚠️ 本条规则不串到 plugin-code-gen 阶段**——写代码时以 `plugin-code-gen/references/point-types/liteAppComponent/` 点位 doc 为主源，MCP 退为业务语义兜底（见 plugin-code-gen plan.md 的查询顺序） |
 
 > 其他类型（page / view / dashboard / config / button）的必填字段全部可由 schema 校验抓住，AI 按 schema 报错提示修即可，plan 阶段不需要特殊行为指引。
 

@@ -4,29 +4,14 @@
 
 **触发**：用户需要读某个工作项列表、展示/筛选/分组字段、订阅上游组件数据。
 
-> ## ⚠️ API 边界声明（进入本场景前必读）
->
-> **`getDataSourceResult` 是 `type=dataSource` 属性的专属数据获取方法，不能与其他 liteAppComponent API 混用。**
->
-> - **只服务 dataSource 属性**：入参 `propKey` 必须是在远端声明为 `type=dataSource` 的属性 key；非 dataSource propKey 调用这里会报错或返回空
-> - **独立于 `getProps` / `watch` 通道**：
->   - `getProps()` 返回的 dataSource 值是**订阅配置元信息**（指向哪个上游），不是工作项列表
->   - `watch` **不订阅** dataSource 数据变化（watch 只管管理员配置的普通属性，见 `consume-props.md`）
->   - 数据更新靠**主动调** `getDataSourceResult`（mount / 翻页 / 筛选 UI `onSubmit` 等时机），不要尝试通过 watch 回调联动刷新
-> - **不能替代 `getProps`**：想读 text / number / select / viewSelect 等管理员配置属性 → 用 `getProps()`，不要拿 `getDataSourceResult` 当万能读值方法
-
 ## 1. 定义数据源属性
 组件需要一个 `dataSource` 类型的 property（`propKey` 自定）。管理员搭建时把它绑定到上游组件 `notify` 的 dataSet 输出（= 订阅）。
 
 > 声明路径见 plan.md 的"点位配置的声明边界"段。本 skill 不直接声明。
 
-## 2. 定位要消费的工作项字段
+## 2. 定位字段（系统字段 / 自定义字段两路）
 
-> ⚠️ **语义边界（必读，常见混淆源）**：
-> - 这里定位的"字段"是**上游推给你的工作项实例**上的 `fieldKey`（即 `item.fields[fieldKey]`），是在你在步骤 1 声明的 `dataSource` 实例列表中的字段
-> - **字段完全来源于上游数据源对应的工作项类型**——插件侧决定不了工作项上有哪些字段，只能基于该工作项类型实际存在的字段去取值
-
-判断路径：先知道**上游数据源绑的是哪个工作项类型**（问用户或从已有配置读），再定位要消费该工作项类型上的哪些字段。两类路径 **先试 2a 速查，匹配不上再走 2b 查真实**：
+工作项字段分两类，**先试 2a，匹配不上再走 2b**，可省去很多情况下的 spaceId/lark-project 调用。
 
 ### 2a-1 系统字段 fieldKey 速查（用户口语 → 直接用）
 
@@ -47,7 +32,7 @@
 | 归档日期 | `archiving_date` | `date` |
 | 工作项类型 | `work_item_type_key` | `select` |
 | 所属空间 | `owned_project` | `text` |
-| 排期 | `schedule` | `date_range` |
+| 排期 | `schedule` | `date_range`（**插件消费侧不暴露**，告知用户限制） |
 | 工作项 id | `work_item_id` | `number` |
 
 **不在上表的 fieldKey 必须走 2b**——业务自定义字段（`field_xxxxxx` hash）+ 其他系统字段（如终止 `aborted` 等，全集查 MCP `字段与属性解析格式`）。
@@ -119,30 +104,34 @@
 ```ts
 const { data, total, hasMore } =
   await window.JSSDK.liteAppComponent.getDataSourceResult(
-    'items',                         // propKey：步骤 1 声明的 dataSource 属性
+    'items',                         // propKey：第 1 步声明的属性
     { pageNum: 1, pageSize: 50 },
   );
 
-// data = 上游推来的工作项实例数组
-// item.fields[fieldKey] = 该工作项实例上的字段值；字段来自上游绑定的工作项类型定义，
-// 不是你声明的组件属性。fieldKey 不能从 getProps() 获取。
 data.forEach(item => {
-  const priority = item.fields['priority'];        // 系统字段，即上面 2a-1 速查表的 priority fieldKey
-  const channel  = item.fields['field_f5ed1b'];    // 自建字段，即上面 2a-1 速查表的 field_f5ed1b fieldKey
+  const priority = item.fields['priority'];        // 内置字段
+  const channel  = item.fields['field_f5ed1b'];    // 自建字段
 });
 ```
 
-**两套 key 别混（归属完全不同）**：
+**两套 key 别混**：
 
-| 命名空间 | 归属 | 例子 | 用在哪 |
-|---|---|---|---|
-| **propKey** | **你自己声明的组件属性** key（在远端 properties/outputs 里） | `items` / `displayMode` | `getProps()[propKey]` / `getDataSourceResult(propKey, ...)` / `notify(propKey, ...)` |
-| **fieldKey** | **上游推来的工作项实例**的字段 key（由工作项类型定义） | `priority` / `field_f5ed1b` | 只能用在 `item.fields[fieldKey]` |
+| 命名空间 | 例子 | 用在哪 |
+|---|---|---|
+| propKey | `items` / `displayMode` | `getProps()[propKey]` / `getDataSourceResult(propKey, ...)` / `notify(propKey, ...)` |
+| fieldKey | `priority` / `field_f5ed1b` | `item.fields[fieldKey]` |
 
-**严格禁止**：
-- `item.fields['items']`（把 propKey 当 fieldKey 用）→ 永远 undefined
-- `getProps()['priority']`（把 fieldKey 当 propKey 读）→ 拿不到工作项字段值，只会拿到同名组件属性（通常 undefined）
-- `getProps()[propKey].fields[...]`（以为 getProps 里嵌套工作项数据）→ getProps 不返回工作项数据
+把 propKey 当 fieldKey 用（`item.fields['items']`）永远 undefined。
+
+## 4. 提醒用户挂字段到表单（最常见踩坑）
+
+写完代码 MUST 提醒用户：
+
+> 选的字段 `XX (key: xxx)` 需要在飞书项目空间的**工作项类型表单配置**里挂上，并且调试工作项实际填了值——否则 `item.fields[xxx]` 会是 undefined。
+> "字段定义存在" ≠ "表单在用"，未挂表单的字段不会出现在 fields 里。
+
+undefined 排查顺序：fieldKey 拼写 → 字段是否挂到表单 → 工作项是否真填过值。
+**禁止代码里静默兜底**，让 undefined 暴露出来给用户排查源头。
 
 ### 交付兜底（让用户人工确认字段在工作项类型里真实存在）
 
@@ -155,3 +144,24 @@ data.forEach(item => {
 
 用户反馈"看不到"时，AI 的第一反应不是改代码，而是先让用户确认 fieldKey 是否真在该工作项类型里——大概率是字段定位环节不对（用错了 fieldKey、或字段属于其他工作项类型），不是代码逻辑问题。
 
+## 5. 订阅数据源变化
+
+`watch(cb)` 回调入参是**全量 props**（dataSource 属性本身变化会给你新的 propValue），但**拿不到数据源背后的工作项列表**——背后数据变化要**主动再调** `getDataSourceResult`。标准骨架：
+
+```ts
+await window.JSSDK.liteAppComponent.watch(async (nextProps) => {
+  // 判断是不是"数据源"属性发生变化（propKey 与步骤 1 声明的 dataSource 属性一致）
+  if (Object.keys(nextProps).includes('items')) {
+    const { data } = await window.JSSDK.liteAppComponent.getDataSourceResult(
+      'items',
+      { pageNum: 1, pageSize: 50 },
+    );
+    setData(data);
+  }
+});
+```
+
+**关键点**：
+- 不能假设 watch 回调里就带着新的工作项数据——`nextProps['items']` 只是订阅**元信息**（比如指向哪个 dataSet 源），不是工作项数组本身
+- 必须再调一次 `getDataSourceResult(propKey, ...)` 拿最新数据
+- 判断 propKey 用 `Object.keys(nextProps).includes(propKey)` 而不是直接 `nextProps[propKey]`——属性值可能为 falsy，但"key 存在"说明这个属性被推送了新配置

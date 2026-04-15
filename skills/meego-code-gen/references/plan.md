@@ -19,38 +19,32 @@
 
 ### 2.1 定位点位类型
 
-从 `plugin.config.json` 的 `resources[].type` 读出要开发的点位类型（如 `liteAppComponent` / `control` / `customField` 等），作为后续 2.2 的锚点。
+从 `plugin.config.json` 的 `resources[].type` 读出要开发的点位类型（如 `liteAppComponent` / `control` / `customField` 等），作为后续 2.2/2.3 的锚点。
 
-### 2.2 查询顺序（严格时序，禁止跳步并行）
+### 2.2 Read 点位专属 doc（场景入口）
 
-**Step 1 — Read 点位专属 doc（有就必须先读完再进下一步）**
-
-doc 是本点位的**流程 / 场景 / 跨 API 协同 / 踩坑**指南，是主骨架，照抄流程步骤不拆散重组：
+doc 是本点位的**流程/场景/跨 API 协同**指南，首先 Read 对应那一份：
 
 | 点位类型 | doc 路径 |
 |---|---|
 | `liteAppComponent` | `references/point-types/liteAppComponent/` 目录：先 Read `index.md`，按用户需求 Read `consume-data.md` / `provide-data.md` / `consume-props.md` 中的一份或多份；**禁止预加载全部场景** |
-| 其他点位 | 待补（当前版本暂无场景指南，跳到 Step 4 兜底） |
+| 其他点位 | 待补（当前版本暂无场景指南，跳到 2.4 兜底） |
 
-**Step 2 — 按 doc 指向查 `@lark-project/js-sdk/dist/types/index.d.ts`**
+### 2.3 三源分工（职责不重叠）
 
-校准 doc 里提到的 API 签名（存在性 / 参数 / 返回值）。types 里没写的方法 = 不存在，禁止反推。
-
-**Step 3 — 仅当 doc + types 没覆盖业务语义时查飞书项目知识 MCP**
-
-MCP 只在以下场景查：枚举含义、参数取值空间、业务概念解释。**禁止用于**：API 签名（走 types）、API 组合流程（走 doc）、propKey/fieldKey 归属（走 doc）。
-
-**Step 4 — doc 缺失的兜底**
-
-本点位无专属 doc 时，只靠 types + MCP 两源开发。若两源也拿不到可用线索 → 按 meego-shared "无源即停"停下问用户。**禁止**凭经验直接写 `window.JSSDK.xxx`。
-
-### 2.3 冲突裁决（只用于两源矛盾时，不是查询顺序）
+| 源 | 权威范围 | 用法 |
+|---|---|---|
+| **点位 doc** | 场景组合 / 流程 / 跨 API 协同 / 踩坑 | 主骨架，照抄流程步骤，不拆散重组 |
+| **`@lark-project/js-sdk/dist/types/index.d.ts`** | TS 签名（存在性 / 参数 / 返回值） | 写代码前 MUST 校准 |
+| **飞书项目知识 MCP** | 业务语义 / 枚举含义 / 参数取值空间 | doc 没讲清业务时查；调不通走"无源即停" |
 
 **冲突优先级**：types > doc > MCP。signature 不一致（SDK 升级）→ 以 types 为准并提醒用户 doc 可能过期。
 
-**为什么 doc 必须先读**：单查 MCP 片段或 types 签名，拼不出"API 组合顺序 / propKey vs fieldKey 归属 / 订阅协议约束"这类跨 API 约束，容易凑出**能过 tsc 但运行时跑废**的代码（典型：把 propKey 当 fieldKey 用、getDataSourceResult 忘了配 watch 刷新、notify 推数组而非 moql）。
+**禁止**：types 里没写的方法"应该有"反推、MCP 模糊片段补全、凭经验写 `window.JSSDK.xxx`。
 
-**禁止**：types 里没写的方法"应该有"反推、MCP 模糊片段补全、凭经验写 `window.JSSDK.xxx`、跳过点位 doc 直接组装 API 调用。
+### 2.4 doc 缺失的兜底
+
+本点位无专属 doc 时，只靠 2.3 的 MCP + types 两源开发。若两源也拿不到可用线索 → 按 meego-shared "无源即停"停下问用户，`<具体内容>` 填 API 名或场景关键词。**禁止**凭经验直接写 `window.JSSDK.xxx`。
 
 ## P3：代码反模式清单（本 skill 专属黑名单）
 

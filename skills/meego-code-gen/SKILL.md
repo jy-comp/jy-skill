@@ -15,14 +15,7 @@ metadata:
 
 > **前置**：先 Read [`../meego-shared/SKILL.md`](../meego-shared/SKILL.md) 获取共享规则；进入每个 mode 前 Read 对应的 `references/<mode>.md`。
 
-**代码溯源协议(CRITICAL — 承袭"无源即停"通则)**：每行 SDK 调用必须能追溯到合法信息源，**查询顺序固定**：
-
-1. **点位专属 doc**（`references/point-types/<点位类型>/`）—— 有就**必须先读完**，它是"场景流程 + 跨 API 协同 + 踩坑"的主骨架
-2. **`@lark-project/js-sdk` 类型定义** —— 校准签名 / 参数 / 返回值
-3. **用户提供的代码** —— 真实业务上下文
-4. **飞书项目知识 MCP** —— **仅限**前三源没讲清业务语义（枚举含义、取值空间）时兜底查
-
-**禁止跳过 1 直接查 MCP/SDK 自行拼接用法** —— 点位 doc 里写的 API 组合顺序、propKey/fieldKey 归属、订阅协议约束，单查 MCP 片段或 types 签名拼不出来，容易凑出能过 tsc 但运行时跑废的代码。<!-- TODO(lark-project): 调试完成后补回：；工作项/视图等实例数据必须通过 `lark-project` skill 查询，不得从 schema 或对话上下文脑补 -->找不到合法信息源时必须停下询问用户。详见 [`references/plan.md`](references/plan.md) 的"代码溯源协议"章节，apply 阶段会派 reviewer subagent 强制审计。
+**代码溯源协议(CRITICAL — 承袭"无源即停"通则)**：每行 SDK 调用必须能追溯到合法信息源（飞书项目知识 MCP 示例 / `@lark-project/js-sdk` 类型定义 / 用户提供的代码）<!-- TODO(lark-project): 调试完成后补回：；工作项/视图等实例数据必须通过 `lark-project` skill 查询，不得从 schema 或对话上下文脑补 -->。找不到合法信息源时必须停下询问用户。详见 [`references/plan.md`](references/plan.md) 的"代码溯源协议"章节，apply 阶段会派 reviewer subagent 强制审计。
 
 ## 核心流程
 
@@ -74,10 +67,10 @@ mode=pipeline（默认）→ setup → plan → apply → verify
 
 ## 各模式详细流程
 
-- `mode=setup`  → **必须先 Read `references/setup.md`**
-- `mode=plan`   → **必须先 Read `references/plan.md` 及其指向的 `references/point-types/<点位类型>/` 下相关 doc，未 Read 不得进入 apply**
-- `mode=apply`  → **必须先 Read `references/apply.md`；若 plan 阶段未 Read 对应 point-types doc，停下补读后再写代码**
-- `mode=verify` → **必须先 Read `references/verify.md`**
+- `mode=setup`  → 读取 `references/setup.md`
+- `mode=plan`   → 读取 `references/plan.md`
+- `mode=apply`  → 读取 `references/apply.md`
+- `mode=verify` → 读取 `references/verify.md`
 
 ## 输出产物
 

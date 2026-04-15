@@ -27,39 +27,15 @@ metadata:
 
 ## 完整流程
 
-```
-┌─────────────────────────────────────────────────────┐
-│  用户："我需要一个在详情页展示关联需求图谱的功能"        │
-└──────────────────────┬──────────────────────────────┘
-                       ▼
-              ┌── Phase 1：理解需求 ──┐
-              │  分析功能需求          │
-              │  → 用户确认理解 ←      │  ← 只确认功能，不涉及点位
-              └────────┬──────────────┘
-                       ▼
-              ┌── Phase 2：搭建工程 ──┐
-              │  env-setup（如需要）   │
-              │  plugin-create         │
-              │  拉取 schema           │
-              │  分析推荐点位          │
-              │  → 用户确认点位方案 ←  │  ← 基于 schema 的专业推荐
-              │  meego-point-config    │
-              └────────┬──────────────┘
-                       ▼
-              ┌── Phase 3：实现功能 ──┐
-              │  plugin-code-gen       │
-              │  本地调试预览          │
-              │  → 用户确认功能 OK ←   │  ← 关键交互点
-              └────────┬──────────────┘
-                       ▼
-              ┌── Phase 4：发布上线 ──┐
-              │  plugin-polish         │
-              │  plugin-publish        │
-              └───────────────────────┘
-```
+1. **Phase 0 — 确认站点上下文** → 询问用户 siteDomain（MUST，禁止默认）
+2. **Phase 1 — 理解需求** → 确认功能（不涉及点位）
+3. **Phase 2 — 搭建工程** → env-setup（按需）/ plugin-create / schema / 点位方案确认 / meego-point-config
+4. **Phase 3 — 实现功能** → plugin-code-gen / 本地调试 / 功能确认
+5. **Phase 4 — 发布上线** → plugin-polish / plugin-publish
 
 ## 各阶段详细流程
 
+- Phase 0 → 读取 `references/phase-0-context.md`
 - Phase 1 → 读取 `references/phase-1-understand.md`
 - Phase 2 → 读取 `references/phase-2-scaffold.md`
 - Phase 3 → 读取 `references/phase-3-implement.md`

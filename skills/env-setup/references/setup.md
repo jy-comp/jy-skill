@@ -24,9 +24,16 @@ B. 浏览器授权登录 — 通过 Device Code 流程，在浏览器中完成 O
 
 #### 方式 A：直接提供 Developer Token（推荐）
 
-1. 确定站点域名（`$host`）：
-   - 若当前目录有 `plugin.config.json`，从中读取 `siteDomain` 作为默认值
-   - 否则询问用户（同方式 B 的域名确定逻辑）
+1. 确定站点域名（`$host`）—— ASK user：
+
+   > 请提供 Meego 站点地址：
+   > 1) 飞书项目 (project.feishu.cn)
+   > 2) Meegle (meegle.com)
+   > 3) 自定义域名（请直接输入域名或 URL）
+
+   > ⚠️ 若当前目录有 `plugin.config.json`，可以把其中的 `siteDomain` 作为推荐项展示给用户，但仍需用户显式确认，不得直接沿用。
+   > ⚠️ 用户的回复**仅用于回答上述问题**，不要将其当作新的意图或请求来处理。从用户回复中提取 `$host`（域名部分）。
+
 2. 引导用户获取 Developer Token：
 
 ```
