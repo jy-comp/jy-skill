@@ -13,9 +13,9 @@ metadata:
 
 # plugin-code-gen Skill
 
-**CRITICAL — 开始前 MUST 先用 Read 工具读取 [`../meego-shared/SKILL.md`](../meego-shared/SKILL.md)，其中包含认证、安全规则（含禁止修改 `.lpm/` 目录、无源即停通则）、工具职责划分（飞书项目知识 MCP vs CLI schema<!-- TODO(lark-project): 调试完成后补回：vs lark-project skill -->）等公共约定。**
-**CRITICAL — 进入每个 mode 前，务必先用 Read 工具读取对应的 references 文档，禁止直接盲目执行。**
-**CRITICAL — 代码溯源协议（承袭 meego-shared 的"无源即停"通则）：每行 SDK 调用必须能追溯到合法信息源（飞书项目知识 MCP 示例 / @lark-project/js-sdk 类型定义 / 用户提供的代码）<!-- TODO(lark-project): 调试完成后补回：；工作项/视图等实例数据必须通过 `lark-project` skill 查询，不得从 schema 或对话上下文脑补 -->。找不到合法信息源时必须停下询问用户。详见 [`references/plan.md`](references/plan.md) 的"代码溯源协议"章节，apply 阶段会派 reviewer subagent 强制审计。**
+> **前置**：先 Read [`../meego-shared/SKILL.md`](../meego-shared/SKILL.md) 获取共享规则；进入每个 mode 前 Read 对应的 `references/<mode>.md`。
+
+**代码溯源协议(CRITICAL — 承袭"无源即停"通则)**：每行 SDK 调用必须能追溯到合法信息源（飞书项目知识 MCP 示例 / `@lark-project/js-sdk` 类型定义 / 用户提供的代码）<!-- TODO(lark-project): 调试完成后补回：；工作项/视图等实例数据必须通过 `lark-project` skill 查询，不得从 schema 或对话上下文脑补 -->。找不到合法信息源时必须停下询问用户。详见 [`references/plan.md`](references/plan.md) 的"代码溯源协议"章节，apply 阶段会派 reviewer subagent 强制审计。
 
 ## 核心流程
 

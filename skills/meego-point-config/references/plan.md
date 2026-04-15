@@ -14,22 +14,6 @@ npx @byted-meego/cli@builder local-config get > plugin.temp.local-remote.json
 
 ## P2：识别操作类型和点位类型
 
-### P2.0：MCP 调用协议（前置 gate + 后置兜底）
-
-调 MCP 工具（如 `search_meegle_plugin_docs`）的**前后**都按"无源即停"处置，**一段协议收口**：
-
-**前置**：调用前 MUST 读 `<project-root>/.meego-state.json` 按状态分派——完整分派表、siteDomain 校验、反向自愈、强制阻塞语义，**全部**见 `meego-shared/SKILL.md` 的"MCP State 文件"段。本处不重复。
-
-**后置**（MCP 返回后视为"无合法信息源"的情形）：
-- `tool not found` / `InputValidationError`（MCP 断链） → 触发反向自愈（见 meego-shared），state 回写 `absent`
-- 调用超时 / 401 / 403 → 同上
-- 返回空结果 / 明显无关片段 / 覆盖不全 → 按"无源即停"停下问用户，state 保持 `loaded`（是结果问题不是工具问题）
-
-**本 skill 专属的禁止降级动作**（通用"无源即停"在点位配置场景的落地）：
-- ❌ 用 `point-schema.json` 的字段名 / 枚举值脑补业务含义（schema 只告字段形状，不告字段语义）
-- ❌ 凭 AI 内置经验类比（"通常 work_item_type 的 key 大概就是 xxx"）
-- ❌ 沉默继续 + 挑一个"看起来合理"的值
-
 ### P2.1：识别点位类型
 
 结合以下信息综合判断：
@@ -59,7 +43,7 @@ page | view | dashboard | config | control | button | intercept | listen_event |
 | 用户说"添加拓展字段**组件**"却映射到 liteAppComponent | 应新增 `customField` 类型的点位 | 用户口语中的"组件"只是泛称，关键词是"拓展字段"→ customField |
 | 用户说"添加控件"却塞进现有点位的配置里 | 应新增 `control` 类型的点位 | "控件"= control 点位，是独立的顶层配置 |
 
-**术语→点位映射（CRITICAL — "组件"一词极易误导）：**
+**⚠️ 术语→点位映射（"组件"一词极易误导）：**
 
 > schema 中 `liteAppComponent` 叫"轻应用组件"，`component` 叫"组件位"，但用户日常口语中"组件"可能指任何东西。
 > **不要仅凭"组件"二字就映射到 liteAppComponent 或 component，必须看完整上下文中的核心名词。**
@@ -88,11 +72,11 @@ page | view | dashboard | config | control | button | intercept | listen_event |
 
 **规则：一次只问一个问题**，语义化表达（例：不说"key 是什么"，而说"这个点位的唯一标识符打算用什么？建议格式如 my_board_point"）。
 
-### 禁止编造 URL（CRITICAL）
+### 禁止编造 URL
 
-**绝对禁止编造任何 URL、icon_url、token 值。完整字段清单和判定规则以 `meego-shared/SKILL.md` 的"禁止编造 URL"章节为准**（Runtime URL vs Metadata URL 的分类表），本节只补充 meego-point-config 在 P3 阶段的具体执行动作。
+完整判定规则（含 Runtime / Metadata 分类表与所有 URL 字段清单）见 [`meego-shared/references/url-policy.md`](../../meego-shared/references/url-policy.md)。本节补充 P3 阶段的具体执行动作。
 
-### Runtime URL 的统一询问流程（CRITICAL）
+### Runtime URL 的统一询问流程
 
 对本次计划生成的每个点位，按下表**从点位类型 + DSL 内容联合判断**要询问哪些 URL：
 

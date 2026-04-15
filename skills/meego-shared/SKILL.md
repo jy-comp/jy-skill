@@ -1,7 +1,7 @@
 ---
 name: meego-shared
 version: 1.0.0
-description: "Meego 插件开发共享基础：CLI 可用性检查、Device Code OAuth 认证、Token 管理、安全规则。所有 meego-* / plugin-* skill 的公共前置依赖。"
+description: "Meego 插件开发共享基础：插件工程识别、Device Code OAuth 认证、Token 管理、安全规则。所有 meego-* / plugin-* skill 的公共前置依赖。"
 metadata:
   requires:
     bins: ["npx"]
@@ -51,194 +51,13 @@ metadata:
 2. 用户的操作指令（"启动调试"、"发布"、"改名称"等）应路由到 `meego-cli` skill 查找对应命令
 3. 涉及多步编排的操作（"加个点位"、"做一个新功能"）应路由到对应的编排 skill
 
-## CLI 可用性检查
-
-```bash
-npx @byted-meego/cli@builder --version
-```
-
-- 成功（输出版本号）→ CLI 可用
-- 失败 → 提示用户安装：`npm install -g @byted-meego/cli@builder`
-
-## 飞书项目知识 MCP（每次 env-setup 执行探测；结果对下游 soft）
-
-env-setup 第三段：飞书项目知识 MCP 提供"自然语言需求 → 用什么插件能力实现"的知识检索。装上 AI 准确度显著提升；未装时 AI 仍可基于 schema 推断，效果次优。
-
-| 接入参数 | 值 |
-|---------|-----|
-| 名称（建议） | `feishu-project-knowledge` |
-| 传输方式 | HTTP |
-| URL | `{siteDomain}/mcp_server/knowledge`（与 CLI 同域） |
-| 鉴权 | 无需额外 header，复用 CLI 的 Token |
-
-> ⚠️ **安装由当前 AI agent 自行完成**：本 skill 不绑定具体 host（Claude Code / Cursor / Cline / Gemini CLI / Copilot CLI / 其他）。AI agent 应判断自身 host 类型，派子 agent 按对应机制安装；不要直接把"装 MCP"丢回给用户。
->
-> **校验风格（AI-facing ≠ User-facing，不得混淆）**：
-> - **对 AI：探测动作是 MUST / hard error**。每次 env-setup 被触发都必须执行 S3a（ASK + VERIFY）探测并把结果写入 state 文件（见下方"MCP State 文件"）。跳过探测 = 硬错，等同于跳过 S1/S2。不接受"CLI + Token 都好"、"上次装过"、"看起来有工具"等理由——AI 对自身工具列表的元认知不可靠。
-> - **对用户：探测结果是 soft**。未加载 / 装失败 **不阻断**本次任务；装成功后提示重启但不强制。下游 skill 在调 MCP 前读 state 文件，遇到非 `loaded` 直接走"无源即停"兜底，与 CLI / Token 缺失时的处理一致。
-> - **二元锁死**：soft 是对"探测结果如何处置"的，不是对"要不要探测"的。不存在"跳过探测"的合法分支。
-
-详细分支见 `env-setup/references/setup.md` 的 S3a/b/c。
-
-### MCP State 文件（跨 skill 契约 — 唯一定义源）
-
-> 本段是 MCP state 的**唯一权威定义**。所有下游 skill（meego-point-config / plugin-code-gen / plugin-workflow 等）不得复制本段表格，只能引用"见 meego-shared 的 MCP State 文件段"。
-
-**路径**：`<project-root>/.meego-state.json`
-
-**"项目根" 的唯一定义**：从当前 cwd 开始向上搜，找到第一个含 `plugin.config.json` 的目录。搜到 `/` 仍未找到 → **当前不在插件工程**，跳过 state 读写（既不写、也不读，下游视为 unchecked）。禁止用 cwd、`git rev-parse --show-toplevel`、或其他启发式替代此算法。
-
-**Schema（version 1）**：
-
-```json
-{
-  "version": 1,
-  "feishuKnowledgeMcp": "loaded" | "installed_pending_restart" | "absent" | "unsupported",
-  "siteDomain": "<state 归属的站点，如 https://meego.feishu.cn>",
-  "checkedAt": "<ISO-8601>"
-}
-```
-
-- `version`：schema 版本号。读侧遇到 version 缺失或与预期不符 → **视为 unchecked**，不沉默兼容。
-- `siteDomain`：必填。MCP URL 绑站（`<siteDomain>/mcp_server/knowledge`），A 站 loaded ≠ B 站可用，下游必须逐字段比对。
-- `feishuKnowledgeMcp`：四选一，语义见下方读取方表。
-- `checkedAt`：ISO-8601 时间戳，纯诊断，gate 不参考（无 TTL）。
-
-> 曾经考虑的 `host` 字段（AI host 名）已移除——读取侧没有决策用途，留着只会诱导 AI 自作主张。host 信息若需排障，放日志不放 state。
-
-**原子写入协议**：state 文件只支持"整体覆盖"。写入方 MUST：
-1. 构造完整的新 JSON 对象（包含所有字段，不做部分 patch）
-2. 用 Write 工具一次性覆盖（Write 语义即 create-or-replace，单次写原子）
-3. 禁止"读 → 改字段 → 写回"的非原子路径；若必须更新某字段，先读入→在内存中构造新对象→整体 Write
-
-**并发读失败**：读侧解析 JSON 失败（读到半写状态 / 非法 JSON / 字段缺失 / version 不符）→ 一律 **视为 unchecked**，不尝试部分解析、不猜测内容、不重试。
-
-**写入方**：`env-setup` S3 每个分支结束时 MUST 落盘（详见 env-setup S3d）。
-
-**读取方按状态分派**：
-
-| 状态 | 下游行为 |
-|---|---|
-| `loaded` **且** `state.siteDomain === plugin.config.json.siteDomain` | 继续，正常调 MCP |
-| `loaded` **但** siteDomain 不匹配 | **视为 unchecked**，回跳 `/env-setup` 的 S3 在新站点重探；不要信任跨站 loaded |
-| `absent` / `unsupported` | **直接走"无源即停"**（见下方"无源即停"段），不要先试调 MCP 等它自然报错 |
-| `installed_pending_restart` | **当作 `absent` 处理**，额外提示"装了但需重启会话，重启后再试会自动 loaded"。**禁止在写入此状态的同一会话中再次尝试调 MCP**——子 agent 刚装完的工具在当前会话物理上不可见，试了也是失败，只会诱发错误的 `tool not found` → 反向自愈回写 absent 的误降级 |
-| 文件缺失 / JSON 非法 / version 不符 / 字段缺失 | **视为 unchecked**，回跳 `/env-setup` 的 S3 |
-| state unchecked（任一上述 unchecked 情形） | **MUST 阻塞本次 skill 任务**——告知用户并停止当前工作；**禁止**"一边提示去跑 env-setup 一边自己乐观试 MCP"。等用户跑完 env-setup、state 文件就绪后再继续 |
-
-**无 TTL + 反向自愈（CRITICAL）**：`loaded` 长期信任。但下游调 MCP 若拿到：
-- `tool not found` / `InputValidationError`（MCP 工具消失）
-- MCP 服务端 401 / 403（Token 失效导致的鉴权失败）
-
-→ **立即把 `feishuKnowledgeMcp` 原子覆盖写为 `absent`**，并走"无源即停"。不得重试、不得换工具名瞎猜。此路径弥补"用户手动卸载 MCP / 切换 host 配置" 后 state 不会自动失效的漏洞，让 gate 从"单向信任"升级为"带自愈的信任"。
-
-**gitignore 协议**：env-setup 写 state 前必须：
-1. 读项目根 `.gitignore`，若未包含 `.meego-state.json` → 追加一行（文件不存在则创建）
-2. 额外检查 `.meego-state.json` 是否**已被 git 追踪**：执行 `git ls-files --error-unmatch .meego-state.json`（在项目根下）
-   - 返回 0（已追踪）→ 提示用户 `git rm --cached .meego-state.json` 后再提交，不得静默写盘（否则 state 会带着 siteDomain 等信息进仓库）
-   - 返回非 0（未追踪）→ 正常写入
-
-## 工具职责划分（CRITICAL — 三类知识源，不得串用）
-
-插件开发过程中涉及三类查询场景，各有专属工具，不得混用：
-
-| 场景 | 专属工具 | 典型问题 |
-|------|---------|---------|
-| **插件能力 / 功能知识**（点位能做什么、SDK 有哪些 API、某个属性如何使用、轻应用组件体系、排期能力限制等概念性知识） | **飞书项目知识 MCP**（`feishu-project-knowledge`） | "轻应用组件支持哪些 propType？"、"customField 怎么拿到行数据？"、"intercept 回调里能拿到什么字段？" |
-<!-- TODO(lark-project): 调试完成后启用此行
-| **工作项实例 / 视图实例 / 空间实例等真实业务数据**（调用 SDK 或生成代码时需要引用的真实 ID、字段、状态等） | **`lark-project` skill** | "这个空间下有哪些工作项类型？"、"某个工作项实例的字段值是什么？"、"视图 id 是多少？" |
--->
-| **点位配置字段形状 / 枚举值匹配**（仅限生成 `point.config.local.json` 时查字段类型、枚举、必填性） | **CLI schema**（`local-config schema` / `meego-cli/schema/developer-plugin.yaml`） | "liteAppComponent 有哪些必填字段？"、"component_type 的枚举值是什么？" |
-
-### 不得串用
-
-- **禁止**用 CLI schema 回答功能性问题（schema 只告诉你"字段叫什么"，不告诉你"这个字段控制什么行为"）→ 走飞书项目知识 MCP
-<!-- TODO(lark-project): 调试完成后启用
-- **禁止**用飞书项目知识 MCP 查实例数据（MCP 是知识库，不是业务数据库）→ 走 lark-project skill
--->
-- **禁止**凭 schema 枚举 / 字段名脑补 SDK 行为或运行时数据 → 任何"这个属性应该是这样用"的推断都必须先查飞书项目知识 MCP
-
-### 场景对照（常见混淆）
-
-- 写点位配置：CLI schema 匹配字段 + 飞书项目知识 MCP 查每个字段的业务含义
-- 写 SDK 调用代码：飞书项目知识 MCP 查 API 签名和用法<!-- TODO(lark-project): 调试完成后补回：+ lark-project skill 拿实例数据（如果代码里要填真实 work_item_id / space_id / view_id） -->
-- 用户问"这个插件里 xxx 功能怎么做"：飞书项目知识 MCP
-<!-- TODO(lark-project): 调试完成后启用
-- 用户问"我这个空间/工作项里有什么"：lark-project skill
--->
-
-> 此分工是"无源即停"通则在工具选择层面的落地：每次查询前先确认"我要的是知识、实例数据、还是字段形状"，再选对应工具。选错工具拿回的答案本质上也是编造。
-
 ## 认证
 
-Meego 插件开发采用统一认证，完成一次授权即可使用所有功能。无细分权限，Token 有效即可执行全部操作。
+Token 由 CLI 统一管理。CLI 遇 auth 问题会 stderr 打印完整登录指引（`Authentication required for ...` + 方式 A/B + 完整可执行命令）。
 
-### 双 Token 机制
-
-支持两种 Token，**按域名独立存储**，优先使用永久 Token：
-
-| Token 类型 | 来源 | 有效期 | 优先级 |
-|-----------|------|--------|-------|
-| **Developer Token**（永久） | `login --token <token>` 手动设置 | 永久有效 | **高** — 有它就不需要 OAuth 授权 |
-| **OAuth Token**（临时） | `login` 浏览器授权获取 | 临时，支持自动刷新 | 低 — 仅在无 Developer Token 时使用 |
-
-### Token 存储
-
-Token 按域名存储在 `~/.lpm/auth.json`，格式：
-
-```json
-{
-  "https://project.feishu.cn": {
-    "developerToken": "永久有效的token",
-    "accessToken": "OAuth临时token",
-    "accessTokenExpiresAt": 1234567890,
-    "refreshToken": "...",
-    "refreshTokenExpiresAt": 1234567890,
-    "clientId": "<client_id>",
-    "tokenId": "<token_id>"
-  },
-  "https://meegle.com": {
-    "developerToken": "另一个域名的token"
-  }
-}
-```
-
-- 不同域名的 Token 互不影响
-- `developerToken` 永久有效，无需刷新
-- `clientId` + `refreshToken` 用于 OAuth Token 的自动刷新
-- API 请求通过 `Authorization: Bearer <token>` 消费（优先取 `developerToken`）
-
-### Token 检查
-
-检查 `~/.lpm/auth.json` 中当前域名是否有可用 Token：
-- 有 `developerToken` → 直接使用，认证通过
-- 有 `accessToken` → 检查是否过期，过期则自动刷新
-- 都没有 → 需执行认证流程（见下方）
-
-### 认证流程
-
-支持两种方式：
-
-**方式 A（推荐）：直接设置永久 Developer Token**
-
-引导用户前往 `<站点域名>/openapp/settings` 页面复制 Developer Token，然后执行：
-
-```bash
-npx @byted-meego/cli@builder login --site-domain <域名> --token <developer_token>
-```
-
-将永久 Token 写入对应域名的 `developerToken` 槽。有此 Token 后无需再走 OAuth 授权。
-
-**方式 B：Device Code OAuth 浏览器授权**
-
-```bash
-# 以 background 方式执行（阻塞直到用户完成授权或超时）
-npx @byted-meego/cli@builder login --site-domain <域名>
-```
-
-启动后立即读取输出，提取授权码和验证链接发送给用户。后台命令会自动轮询等待授权完成。获取的 OAuth Token 为临时 Token，支持自动刷新。
-
-> 完整的认证步骤详见 [`../env-setup/references/setup.md`](../env-setup/references/setup.md)。
+**AI 的应对**：
+- **默认**：触发 `/env-setup` 接管登录编排（尤其方式 B 的后台 OAuth 流程，用户不切终端）。完成后重试刚才失败的命令。
+- **简化**：若用户明确表示自己跑，或已在 env-setup 上下文中，**逐字转呈** CLI stderr 指引即可。
 
 ### 站点域名（siteDomain）
 
@@ -248,7 +67,7 @@ Token 按域名生效，确定 `siteDomain` 的优先级：
 
 ## 安全规则
 
-- **禁止修改 `.lpm/` 目录下的任何文件**：`.lpm/` 目录由 CLI 内部管理（如 `auth.json`、缓存等），禁止通过 Edit/Write 工具或任何方式直接修改其中的文件，只能通过 CLI 命令间接操作。此禁令仅限 `.lpm/` 目录内部；项目根其它由 skill 体系管理的元文件（如 `.meego-state.json`）不受此限，各自有对应段落定义读写规则。
+- **禁止修改 `.lpm/` 目录下的任何文件**：`.lpm/` 目录由 CLI 内部管理（如 `auth.json`、缓存等），禁止通过 Edit/Write 工具或任何方式直接修改其中的文件，只能通过 CLI 命令间接操作。此禁令仅限 `.lpm/` 目录内部，不扩展到项目根其它文件。
 - **禁止输出密钥**（accessToken、pluginSecret）到终端明文
 - **写入/删除操作前必须确认用户意图**（如发布、删除点位等不可逆操作）
 - **全量提交约束**：`local-config set` 和 `update --source-type=local` 均为全量操作，禁止只传变更部分
@@ -256,7 +75,7 @@ Token 按域名生效，确定 `siteDomain` 的优先级：
 
 ### 无源即停（CRITICAL — 全局通则，统御所有"溯源协议"）
 
-**适用范围**：URL、token、代码、API 调用、字段值、配置参数等所有 AI 输出场景。
+**适用范围**：URL、代码、API 调用、字段值、配置参数等所有 AI 输出场景。
 
 **核心原则**：AI 输出的每一项**有业务语义的内容**都必须能追溯到合法信息源。找不到合法信息源时，**MUST 立即停下来询问用户**，禁止"先填一个看起来合理的，跑不通再说"的中间状态。
 
@@ -313,95 +132,25 @@ C. 提供检索关键词，我重新查（可能找错了）
 
 ### 禁止编造 URL（CRITICAL — "无源即停"通则的 URL 落地）
 
-**绝对禁止编造任何 URL 或图标地址。** 编造的 mock URL（如 `https://example.com/webhook`）在实际使用中完全不可用，会导致插件功能失效。
+**绝对禁止编造任何 URL 或图标地址。** 编造的 mock URL 在运行时完全不可用，会导致插件功能失效。AI 永远不主动创造 URL 字符串——每个值必须来自"用户显式输入"或"用户授权占位"。
 
-> **本规则继承自上方"无源即停"全局通则**。模式 lint（apply 阶段的 A0.5 黑名单）只能识别"长得像假的"URL（`example.com` / `placeholder` 等），**完全识别不出"长得像真的假"**（如 AI 编造的 `https://meego-internal.byted.net/cb`）。
-> 真正的防线是**写入时的溯源协议**——AI 永远不主动创造 URL 字符串，每个值必须能追溯到"用户显式输入"或"用户授权占位"。详细执行流程见各点位 skill 的 plan 阶段（如 `meego-point-config/references/plan.md` 的 "URL 溯源协议"章节）。
+> **CLI 强制兜底**：`local-config set` / `update --source-type=local` 在提交前会自动扫 Runtime URL 占位符（example.com / your-server / `.test`/`.example`/`.invalid` / localhost / `<PLACEHOLDER:...>` 等），命中即 `exit 1`。AI 即使在生成压力下漏填也会被拦住——但这不代表可以省略 plan P3 的主动询问，validator 是**防线**，不是**替代**。
 
-### 判断原则：Runtime URL vs Metadata URL
+**URL 字段分两类**：
+- **Runtime URL**（运行时会发起请求，如 `intercept.url` / `table_url.url` / `listen_event.url`）→ 必须真实可达 → **必须向用户询问**；用户暂无 → 占位符 `<PLACEHOLDER: ...>` + 发布前硬阻
+- **Metadata URL**（如 `liteAppComponent.icon_url` / 插件 icon）→ 不填不影响功能 → 不阻塞
 
-把 schema 里所有 URL 字段按"是否会被运行时打"分两类：
-
-- **Runtime URL（运行时会发起请求）**：必须真实可达。假地址一旦上线就触发功能失败 —— 表现为表格列渲染空白、按钮点击报错、事件收不到回调。**必须向用户询问**。
-- **Metadata URL（仅作为元信息展示）**：不填影响美观但不影响功能，**不阻塞**。
-
-### 完整的 URL 字段清单（以 `meego-cli/schema/developer-plugin.yaml` 为准）
-
-| 字段 | 所属点位 | 类别 | 触发条件 / 处理方式 |
-|------|---------|------|-------------------|
-| `intercept.url` | intercept | Runtime | 始终必问：接收拦截事件的回调地址 |
-| `listen_event.url` | listen_event | Runtime | 始终必问：接收监听事件的回调地址 |
-| `control.url` | control（顶层） | Runtime | 仅当"新建页可见"开启时必填：新建提交时的 Webhook |
-| `control.platform.web.table_url.url` | control | Runtime | **当 `table_cell.definitions.data` 非空时必问**（展示态数据接口，每次展开列都会打） |
-| `customField.platform.web.table_data_url` | customField | Runtime | **当 `table_layout.definitions.data` 非空时必问**（同上） |
-| `template.onClick.params.url` / `onDoubleClick.params.url`（`action=httpRequest`） | 任意 table_cell / table_layout DSL | Runtime | 用户主动声明了 httpRequest action 时必问（点击触发业务请求） |
-| `template.onClick.params.url`（`action=openLink`） | 同上 DSL | Runtime | 字面量 URL 时必问；若用 `{{varName}}` 引用则不填（由数据接口返回） |
-| `liteAppComponent.icon_url` | liteAppComponent | Metadata | **不阻塞**：不填 CLI 自动填充默认图标 |
-| 插件图标 icon | update-description | Metadata | **不阻塞**：不传则保持后台默认图标 |
-
-> ⚠️ **token 字段一律不询问用户**：`intercept.token` / `listen_event.token` / `control.token` / `table_url.token` / `table_data_token` 均由 CLI 在对应 URL 填写后自动生成 36 位 UUID，**AI 不要主动填 token，也不要向用户索要**（即使 schema 标了 required，CLI 也会兜底）。
-
-### 变量声明 → Runtime URL 的联动规则（CRITICAL）
-
-这是最容易漏的一条：任何形如"顶层 `type` + 内含 `{{varName}}`"的 DSL（control.table_cell / customField.table_layout，以及未来任何共用 dslSchema 的新点位）只要 `definitions.data` 非空，就**必须**伴随真实的数据接口 URL（`table_url.url` / `table_data_url`）。
-
-- **为什么**：DSL 里 `{{varName}}` 的值由数据接口响应填充（`work_item_datas[].work_item_data.{varName}`）。URL 不可达 → 变量 undefined → **整列渲染失败**。
-- **判断方法**：AI 不能只凭点位类型判断，而要**扫 DSL 本身**——只要发现 template 里有非 `$container / $i18n / $colorTokens / $fieldValue` 前缀的 `{{x}}` 引用，该点位就属于"有数据变量"类别。
-- **与裸 template 的关系**：裸 template 天然没有 `definitions.data`（结构决定的），不触发此规则；一旦改成完整对象形态并声明任何 `data.xxx`，立即触发。
-
-### 执行原则
-
-- **Runtime URL**：**必须暂停流程向用户询问**；用户暂时没有 → 占位符 `"<PLACEHOLDER: 请替换为你的<具体字段名>>"` 并在摘要醒目标注，发布前硬阻止
-- **Metadata URL**：**不阻塞流程**，不填即可
-- **禁止使用** `https://example.com`、`https://your-server.com`、`https://PLACEHOLDER.invalid/...`、`https://localhost/...`、`.test` / `.example` 结尾等"看起来真实但不可用"的地址——包括 RFC 保留 TLD
-
-### 规则冲突时的兜底（CRITICAL — 不可擅自绕过）
-
-**当 `<PLACEHOLDER: ...>` 字面量与 schema/CLI 校验冲突时**（例如 schema 的 `UrlHttp` 要求 `^https?://`，导致纯文本占位符被 `local-config set` 拒绝），**AI MUST 立即暂停并向用户上报冲突**，不得自作主张采取任何"看似合理"的折中（包括但不限于：使用 RFC 保留 TLD `.invalid`/`.test`/`.example`、伪造看起来不真实的域名、把 PLACEHOLDER 塞进 URL path/query 里拼成合法 URL）。
-
-**正确处理流程：**
-1. 停止当前 apply/set 流程
-2. 向用户明确说明：
-   - 哪个字段
-   - 为什么占位符不能通过校验（引用具体 schema 错误）
-   - 两个选项：(a) 提供真实 URL（推荐）；(b) 明确授权某种 placeholder 写法
-3. 等待用户回复后再继续
-
-**为什么这条规则存在：** 任何被 AI 发明出来的"像 URL 的字符串"都可能被用户当成"已经填好了"漏掉替换，上线后静默失败；且自创占位符破坏评测的独立性（AI 用巧思替代了"向用户要真信息"的硬规则）。**"绝对禁止编造"是绝对的，遇到阻力时默认动作是问用户，不是发明绕过方案。**
+**涉及 URL 字段填写的 skill**（meego-point-config / plugin-publish 的 plan/apply 阶段）**MUST Read** [`references/url-policy.md`](references/url-policy.md) 获取：
+- 完整字段清单（Runtime vs Metadata 对照表）
+- 变量声明 → 数据接口 URL 的联动规则（防止整列渲染失败）
+- `<PLACEHOLDER>` 与 schema 冲突时的兜底流程
+- 禁用的"看起来像真的"假地址黑名单
 
 ## Checkpoint（进度追踪）
 
-当子 skill 被 `plugin-workflow` 调用时（即项目根目录存在 `.plugin-workflow-state.json`），**每个 CLI 命令执行前后必须更新 checkpoint 文件**。
-
-### 判断规则
-
-1. 读取项目根目录 `.plugin-workflow-state.json`
-2. **存在** → 当前处于 workflow 编排中，每步 CLI 前后更新此文件
-3. **不存在** → 子 skill 被独立调用，不需要写 checkpoint
-
-### 更新协议
-
-```
-CLI 命令执行前：
-  → 写入 nextCommand、nextStep，lastCommandStatus 设为 "running"
-
-CLI 命令执行后（成功）：
-  → lastCommand = 刚执行的命令
-  → lastCommandStatus = "success"
-  → nextCommand/nextStep 更新为下一步
-
-CLI 命令执行后（失败）：
-  → lastCommand = 刚执行的命令
-  → lastCommandStatus = "failed"
-  → 保留 nextCommand/nextStep 不变（重试时使用）
-```
-
-### 恢复语义
-
-当 workflow 从 checkpoint 恢复并调用子 skill 时，子 skill 应检查 `lastCommand` + `lastCommandStatus`：
-- 上一步 `"success"` → 跳过该步，执行下一步
-- 上一步 `"failed"` → 重试该步
-- 上一步 `"running"` → 未知状态，重新执行该步
+**判断规则**：子 skill 执行前读项目根 `.plugin-workflow-state.json`：
+- **存在** → 处于 workflow 编排中，按 [`references/checkpoint.md`](references/checkpoint.md) 的协议在每个 CLI 命令前后更新 checkpoint
+- **不存在** → 独立调用，不写 checkpoint
 
 ## 错误处理
 

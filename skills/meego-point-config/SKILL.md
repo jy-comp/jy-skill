@@ -14,8 +14,7 @@ metadata:
 
 # Meego 点位配置管理 Skill
 
-**CRITICAL — 开始前 MUST 先用 Read 工具读取 [`../meego-shared/SKILL.md`](../meego-shared/SKILL.md)，其中包含认证、安全规则（含禁止修改 `.lpm/` 目录、删除点位须确认、禁止编造 URL）、工具职责划分等公共约定。**
-**CRITICAL — 进入每个 mode 前，务必先用 Read 工具读取对应的 references 文档，禁止直接盲目执行。**
+> **前置**：先 Read [`../meego-shared/SKILL.md`](../meego-shared/SKILL.md) 获取共享规则；进入每个 mode 前 Read 对应的 `references/<mode>.md`。
 
 ## 核心流程
 

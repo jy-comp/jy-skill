@@ -17,7 +17,7 @@ metadata:
 
 # Meego 插件 CLI 原子化命令参考 & 诊断工具
 
-**CRITICAL — 开始前 MUST 先用 Read 工具读取 [`../meego-shared/SKILL.md`](../meego-shared/SKILL.md)，其中包含认证、安全规则（含禁止修改 `.lpm/` 目录、禁止编造 URL、删除点位须确认）、插件工程识别、工具职责划分等公共约定。**
+> **前置**：先 Read [`../meego-shared/SKILL.md`](../meego-shared/SKILL.md) 获取共享规则（认证、安全、工具职责、插件工程识别等）。
 
 ## 项目上下文感知
 

@@ -28,60 +28,20 @@
 
 > **禁止跳过此步骤。** 即使 plan 阶段已经确认过删除，apply 阶段仍须再次检查——因为配置文件可能在 plan 之后被修改，或者当前 apply 并非从 plan 阶段进入。
 
-## A0.5：Runtime URL 占位符兜底 lint（CRITICAL — 不可跳过）
+## A0.5：Runtime URL 占位符硬阻（CLI 强制，无需 AI 手动扫）
 
-即将提交的 JSON 里，所有 **Runtime URL**（分类定义见 `meego-shared/SKILL.md` 的"禁止编造 URL"章节）必须真实可达，否则对应功能上线后会失败。此步骤是 plan 阶段 P3 询问的防御性兜底——防止直接从 apply 入口进入绕过 plan，或配置文件在 plan 之后被手动改动。
+**规则体已下沉到 CLI**：`local-config set` 和 `update --source-type=local` 在提交前会自动调用 `validateRuntimeUrls` validator，命中占位符模式（`example.com` / `your-server` / `.test`/`.example`/`.invalid` / `localhost` / `<PLACEHOLDER:...>` 等）即 stderr 打印详细违规清单并 `exit 1`，不允许绕过。
 
-### 扫描范围（遍历提交 JSON 的所有类型）
+**AI 的职责**：
+- plan 阶段 P3 已主动询问用户真实 URL，正常走流程即可。
+- 遇到 CLI 的 validateRuntimeUrls 报错 → 转呈用户 → 用户提供真实 URL → 改配置后重试。**不要尝试"换个占位符绕过"——会被同一套规则再次拦下**。
 
-**顶层 URL 字段**：
-- `intercept[].url`
-- `listen_event[].url`
-- `control[].url`（"新建页可见" Webhook）
+**CLI 扫描范围**（权威定义见 `meego-cli/src/utils/validate-runtime-urls.ts`）：
+- 顶层：`intercept[].url` / `listen_event[].url` / `control[].url`
+- 数据接口（仅当 DSL `definitions.data` 非空时必填）：`control[].platform.web.table_url.url` / `customField[].platform.web.table_data_url`
+- DSL 节点：递归扫 `table_cell` / `table_layout` 的 template 树里所有 `props.onClick.params.url` / `props.onDoubleClick.params.url`（当 `action=httpRequest`，或 `action=openLink` 且 URL 非 `{{varName}}` 引用时）
 
-**数据接口 URL 字段**（仅当该点位的 DSL 声明了变量时才需要真实）：
-- `control[].platform.web.table_url.url` —— 条件：`table_cell` 归一化后 `definitions.data` 非空
-- `customField[].platform.web.table_data_url` —— 条件：`table_layout` 归一化后 `definitions.data` 非空
-- **未来任何新增的、共享 `PlatformWebForControl.table_cell.dslSchema` 的点位类型** —— 扫 `platform.web.<dsl-field>.definitions.data` 与其配套 URL 字段，规则自动适用
-
-**DSL 节点 URL 字段**（扫 template 树的每个节点）：
-- `props.onClick.params.url` / `props.onDoubleClick.params.url`，当 `action` 是 `httpRequest` 或 `openLink`（字面量 URL 时）
-- 递归进入 `children[]`
-
-**`table_cell` / `table_layout` 的三种形态都要扫**：
-- 完整对象 `{definitions, template}` → 扫 template 树
-- 裸 template（顶层直接 `type`） → 扫整棵树
-- JSON 字符串 → 先 `JSON.parse` 再扫（parse 失败则跳过，让 schema 自己报错）
-
-### 触发警示的 URL 特征
-
-值匹配以下任一可疑模式（大小写不敏感）即判定为"占位符"：
-
-- `example.com` / `example.org` / `example.net`
-- `your-server` / `your-domain` / `your-api` / `your-host`
-- `placeholder` / `<placeholder`
-- `.invalid` / `.test` / `.example`（RFC 2606 保留 TLD，永远无法解析）
-- `localhost` / `127.0.0.1` / `0.0.0.0`（生产环境无法访问）
-- `mock` / `fake` / `dummy` / `foo.bar` / `sample`
-- 空字符串或仅空白（对"必填"的 Runtime URL 而言）
-
-### 处理流程
-
-1. 若发现任一可疑 URL，**立即暂停**，列出清单（按点位分组）：
-   ```
-   🔴 以下 URL 看起来是占位符，上线后对应功能会失败：
-   - intercept[intercept_abc]: url = https://example.com/callback
-   - control[control_xxx]: table_url.url = https://PLACEHOLDER.invalid/...
-     （该点位 table_cell 声明了变量：varName1, varName2）
-   - control[control_yyy].table_cell.template.children[0].props.onClick.params.url
-     = https://your-api.test/submit
-     （action=httpRequest）
-   - customField[ft_zzz]: table_data_url 缺失（table_layout 声明了变量）
-   ```
-
-2. **硬阻止，不提供绕过选项**：要求用户提供真实 URL → 修改配置后重新进入 A0。不允许"先占位、后替换"。
-
-**此步骤无论从 pipeline / plugin-workflow / 单独 apply 入口进入均须执行**。即使 plan 阶段已问过，A0.5 仍要再扫一遍——文件可能被手动改过。
+此 lint 覆盖所有调用路径：pipeline / plugin-workflow / 单独 apply 入口进入均会触发，因为规则在 CLI 层,AI 的流程分支无法绕开。
 
 ## A1：Schema 校验（local-config set）
 
