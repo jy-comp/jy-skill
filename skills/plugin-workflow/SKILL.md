@@ -3,7 +3,7 @@ name: plugin-workflow
 version: 1.0.0
 description: |
   端到端插件开发流程编排：用户描述功能需求 → 自动创建插件 → 配置点位 → 生成代码 → 本地调试 → 完善信息 → 发布。
-  当用户说"我需要一个 xxx 功能"、"帮我做一个 xxx"、"我想在看板/详情页/按钮上加 xxx"等场景时触发。
+  当用户说"飞书项目插件开发" "Meegle插件开发" "我需要一个 xxx 功能"、"帮我做一个 xxx"、"我想在看板/详情页/按钮上加 xxx"等场景时触发。
   这是一个面向用户的顶层 skill，内部串联 env-setup / plugin-create / meego-point-config / plugin-code-gen / plugin-polish / plugin-publish。
 metadata:
   requires:
