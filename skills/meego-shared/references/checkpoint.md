@@ -4,7 +4,7 @@
 
 ## 适用条件
 
-子 skill 执行前读取项目根目录 `.plugin-workflow-state.json`：
+子 skill 执行前读取项目根目录 `.lpm-cache/state.json`：
 - **存在** → 当前处于 workflow 编排中，每步 CLI 前后更新此文件（走本文件协议）
 - **不存在** → 子 skill 被独立调用，不需要写 checkpoint（跳过本文件）
 

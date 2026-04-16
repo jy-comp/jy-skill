@@ -1,52 +1,87 @@
 # mode=plan：理解需求 + 交互补全 + 生成配置文件
 
-## P1：获取 Schema 和当前完整配置
+## 点位类型速查
 
-```bash
-npx @byted-meego/cli@builder schema > point-schema.json
-npx @byted-meego/cli@builder local-config get > plugin.temp.local-remote.json
-```
+| 类型 | 一句话用途 |
+|------|---------|
+| `page` | 顶部导航扩展页 |
+| `view` | 工作项列表自定义视图 |
+| `dashboard` | 独立仪表盘页 |
+| `config` | 插件级配置入口 |
+| `control` | 工作项详情页的自定义控件（表单字段/展示块） |
+| `button` | 工作项详情页的自定义按钮 |
+| `intercept` | 状态流转拦截器（同步返回放行/拒绝） |
+| `listen_event` | 工作项事件异步监听（创建/更新/状态变更等） |
+| `component` | 通用组件位（目前支持轻应用） |
+| `customField` | 扩展字段（列表/表单展示 + 数据接口） |
+| `liteAppComponent` | 轻应用组件（搭建器拖拽组件） |
 
-- 若 `local-config get` 返回空，以 `{}` 作为基础
-- **两个命令并行执行**，不要等第一个完成再跑第二个
-- 这两个命令的 stdout 是纯 JSON（CLI v2.6.0+ 会自动避免输出 `[INFO]` 日志），若旧版 CLI 残留日志需 `2>/dev/null` 去噪后再使用
-- 文件后缀使用 `.json`（内容就是 JSON）；勿再沿用 `.yaml` 扩展名
+> **必填字段 / 长度 / 枚举合法性以 `npx @byted-meego/cli@builder schema` 输出为准**，由 `local-config set` 强制校验，本表不再镜像——避免 schema 迭代后漂移。schema 抓不到的行为指引（URL 询问、MCP 强制查询、派生字段规则等）见 `references/plan.md` 的"各类型的行为指引"节。
 
-## P2：识别操作类型和点位类型
 
-### P2.1：识别点位类型
+## P1：识别操作类型和点位类型
 
 结合以下信息综合判断：
 - 用户的原始描述（添加/修改/删除）
 - 飞书项目知识 MCP（查询 work_item_type 枚举值、event_type 编号等业务背景）
-- `point-schema.json` 中的字段约束和枚举
+- `.lpm-cache/schema/point-schema.json` 中的字段约束和枚举
 
-**推断目标点位类型**（参考 SKILL.md 速查表），如有歧义直接询问。
+**若由 plugin-workflow 调用**：会收到 `context.originalRequirement`（用户原话，作为主输入）和可选的 `context.mentionedPointType`（用户主动提到的点位类型）。`mentionedPointType` 有值时直接按该类型走（只需用 schema 切片验证其存在），不再做推荐；为 null 时按常规流程做意图识别和术语消歧后向用户确认点位方案。无论哪条路径，key/name/description 等字段都在 P3 交互补全，不靠上游"推导默认值"。
 
-### ⚠️ 点位类型是彼此独立的顶层概念（CRITICAL — 防混淆）
+**MCP 缓存协议（防 context 爆炸）**：返回后立即 Write 到 `.lpm-cache/mcp/<slug>.md`；回复只给路径 + ≤100 字摘要，禁止原文回流；同一查询先 Read 缓存，7 天以上视为过期重拉。CLI 在 create/init 时自动把 `.lpm-cache/` 写入 `.gitignore`，并在 `local-config set` / `update` / `publish` 成功后按子目录清理，AI 只负责写入、不负责清理。
 
-**每种点位类型在 config JSON 中是独立的顶层 key，绝对不能将一种点位类型作为另一种点位类型的子配置或属性。**
+## P2：获取 Schema 和当前完整配置
 
-以下 11 种点位类型是**完全平级、互不隶属**的：
-
+```bash
+npx @byted-meego/cli@builder schema
+npx @byted-meego/cli@builder local-config get --remote
 ```
-page | view | dashboard | config | control | button | intercept | listen_event | component | customField | liteAppComponent
+
+- 两条命令都是**文件优先**：CLI 把结果写到 `.lpm-cache/schema/point-schema.json` 和 `.lpm-cache/config/remote.json`，stdout 只回一行相对路径
+- **两个命令并行执行**，不要等第一个完成再跑第二个
+- 若 `local-config get` 对应的远端为空，`remote.json` 内容是 `{}`，作为后续增改的基础
+- 后续所有消费（jq 切片、写 draft、diff 对比）都走文件，**不要 Read 整个 JSON 到 context**
+
+### 按点位分片读取 schema
+
+`.lpm-cache/schema/point-schema.json` 约 2400+ 行（~30K tokens）。用 jq 切片按需取用，不要 Read 整文件。
+
+```bash
+# 本次要配置的点位类型的完整 definition（把 LiteAppComponentPoint 换成实际 definition 名）
+jq '.definitions.LiteAppComponentPoint // .integrate_point_schema.definitions.LiteAppComponentPoint' .lpm-cache/schema/point-schema.json
+
+# 自动解析点位类型对应的 definition 名（liteAppComponent → LiteAppComponentPoint）
+jq -r '(.properties.liteAppComponent["$ref"] // .integrate_point_schema.properties.liteAppComponent["$ref"]) | sub("#/.*definitions/"; "")' .lpm-cache/schema/point-schema.json
+
+# 子结构 definition（如嵌套引用的 PlatformWebForControl / WorkItemTypeForButton）
+jq '.definitions.PlatformWebForControl // .integrate_point_schema.definitions.PlatformWebForControl' .lpm-cache/schema/point-schema.json
 ```
 
-**常见混淆（必须识别并纠正）：**
+**只取当前要操作的点位类型** + 它引用的子 definition，其他点位类型的 definition 不要取。生成配置后，`local-config set` 会做完整 schema 校验，不需要 AI 先通读全 schema。
 
-| 错误做法 | 正确做法 | 原因 |
-|---------|---------|------|
-| 把 `customField` 当成 `liteAppComponent` 的一个 property | `customField` 是独立点位，和 `liteAppComponent` 平级放在 config 顶层 | customField 有自己独立的 subfield、platform、table_layout，不是 liteAppComponent 的属性 |
-| 把 `control` 当成 `customField` 的一部分 | `control` 和 `customField` 各自独立 | 两者虽然都在工作项表单中展示，但配置结构完全不同 |
-| 用户说"添加拓展字段"却生成 liteAppComponent 的 properties | 应新增 `customField` 类型的点位 | "拓展字段"= customField 点位，不是 liteAppComponent 属性 |
-| 用户说"添加拓展字段**组件**"却映射到 liteAppComponent | 应新增 `customField` 类型的点位 | 用户口语中的"组件"只是泛称，关键词是"拓展字段"→ customField |
-| 用户说"添加控件"却塞进现有点位的配置里 | 应新增 `control` 类型的点位 | "控件"= control 点位，是独立的顶层配置 |
+### 按需读取 remote.json（对称 schema 分片）
 
-**⚠️ 术语→点位映射（"组件"一词极易误导）：**
+`.lpm-cache/config/remote.json` 是远端全量配置，点位数多时 JSON 可能很大。用 jq 切片按需取，不要 Read 整文件。
 
-> schema 中 `liteAppComponent` 叫"轻应用组件"，`component` 叫"组件位"，但用户日常口语中"组件"可能指任何东西。
-> **不要仅凭"组件"二字就映射到 liteAppComponent 或 component，必须看完整上下文中的核心名词。**
+```bash
+# 类型 + key 列表（做 diff / 删除确认 的最小视野）
+jq 'to_entries | map({type: .key, keys: [.value[].key]})' .lpm-cache/config/remote.json
+
+# 读某个类型下的某个点位（本次要改 / 要比对的那个）
+jq '.liteAppComponent[] | select(.key=="lite_app_xxx")' .lpm-cache/config/remote.json
+
+# 读整个类型下所有点位（append 新点位、需要保留同类原样时）
+jq '.liteAppComponent // []' .lpm-cache/config/remote.json
+
+# 所有 key 扁平集合（仅用于删除确认的集合比较）
+jq '[.[][].key]' .lpm-cache/config/remote.json
+```
+
+写 draft 时也按类型 jq 拼装，不要把 remote.json 整块 Read 进 AI 上下文再拼。
+
+### 术语→点位类型映射（"组件"一词歧义）
+
+schema 中 `liteAppComponent` 叫"轻应用组件"、`component` 叫"组件位"，但用户日常口语里"组件"可以指任何东西。识别规则：**先从用户描述里抽核心名词（拓展字段 / 控件 / 轻应用 / 排期），再映射点位类型。"组件"二字是修饰语，不是判断依据。**
 
 | 用户可能的说法 | 核心名词 | 正确点位类型 | 易错映射 |
 |--------------|---------|------------|---------|
@@ -54,19 +89,6 @@ page | view | dashboard | config | control | button | intercept | listen_event |
 | "控件"/"控件组件" | **控件** | `control` | ~~liteAppComponent~~ |
 | "轻应用组件"/"概览组件"/"构建器组件"/"拖拽组件" | **轻应用/概览/构建器** | `liteAppComponent` | — |
 | "排期组件"/"节点排期" | **排期** | `component` | ~~liteAppComponent~~ |
-
-**识别规则：先提取核心名词（拓展字段 / 控件 / 轻应用 / 排期），再映射点位类型。"组件"是修饰语，不是判断依据。**
-
-**正确的 config 结构示例（多点位类型共存）：**
-```json
-{
-  "component": [{ "key": "comp_xxx", ... }],
-  "customField": [{ "key": "field_template_xxx", ... }],
-  "control": [{ "key": "control_xxx", ... }],
-  "liteAppComponent": [{ "key": "builder_comp_xxx", ... }]
-}
-```
-每种类型各自一个顶层数组，互不嵌套。
 
 ## P3：交互补全缺失字段
 
@@ -89,9 +111,7 @@ page | view | dashboard | config | control | button | intercept | listen_event |
 | 任意 DSL（table_cell / table_layout）里有节点用了 `onClick/onDoubleClick.action=httpRequest` | 对应 `params.url`（按用户业务语义问） |
 | 任意 DSL 里有节点用了 `onClick.action=openLink` 且 URL 是字面量（非 `{{varName}}` 引用） | 对应 `params.url` |
 
-> **token 字段不询问**：所有 `.token`（`intercept.token` / `listen_event.token` / `control.token` / `table_url.token` / `table_data_token`）由 CLI 在对应 URL 填写后自动生成 36 位 UUID，**AI 不要写 token，也不要问用户**。
-
-**扫描方法**：AI **必须在生成 JSON 之前**先扫一遍 template 树，找出所有上述触发点，把 URL 询问合并成一轮对话问给用户（不要每个点位单独问一次）。
+**扫描方法**：生成 JSON 前先扫一遍 template 树，找出所有上述触发点，把 URL 询问合并成一轮对话问给用户（不要每个点位单独问一次）。
 
 **询问话术模板**：
 > "本次计划里有 N 个 URL 字段需要你提供真实地址，否则上线后对应功能会失败：
@@ -107,103 +127,16 @@ page | view | dashboard | config | control | button | intercept | listen_event |
 - **(B) 先占位** → 写入 `"<PLACEHOLDER: 请替换为你的<字段语义>>"`；若 schema 拒绝纯文本占位符，按 `meego-shared` 的"规则冲突兜底"向用户上报再决策；P6 摘要用 🔴 醒目标注，plugin-publish 的 pre-check 会硬阻止
 - **(C) 改方案** → 如用户不想提供 URL，引导改造点位（例：声明变量的 DSL 改成裸 template / 把 httpRequest 换成 openLink / 放弃 intercept 这个点位）
 
-### URL 溯源协议（CRITICAL — 写入时强制，前置预防 ＞ 事后检测）
-
-模式 lint（A0.5）只能逮"长得像假的"URL，**逮不到"长得像真的假"**（例：AI 拼一个 `https://meego-internal.byted.net/api/cb`，所有 lint 规则都过得去，但仍是编造）。
-真正的防线是**写入时禁止 AI 自创 URL 值**。
-
-#### 三条硬约束
-
-1. **零自创原则**
-   每个 URL 字段的值，必须能回答"这个字符串从哪来？"，且**只接受**以下两类来源：
-   - (a) **用户显式输入** —— 用户在本对话中明确给出（粘贴的链接、回复"用 https://x.y.com" 等）
-   - (b) **用户授权占位** —— 用户明确说"先占位发布前补"，写入 `<PLACEHOLDER: ...>` 形式
-   - 任何**第三种情况都禁止**写入字符串，包括但不限于：
-     * 编造看起来"像内网"的域名（`*.byted.net`、`*.bytedance.com` 等）
-     * 复制 MCP 文档示例里的 URL（样例 ≠ 用户的接口）
-     * 拼合用户提到过的部分片段（如用户提了"meego"，AI 自己拼成 `https://meego-prod.example.com`）
-     * 套用其他点位的 URL（除非用户明说"和上面一样"）
-
-2. **检测到无源即停**
-   AI 在生成 JSON 前扫描所有 URL 字段，若任意字段**没有 (a) 或 (b) 来源**，**MUST 暂停**走 P3 询问流程问清楚，**禁止**先写一个看似合理的值"待 lint 处理"。
-
-3. **输出标注溯源（机器可审计）**
-   每个 URL 字段在 P6 输出摘要中必须**显式标注 source**，便于 reviewer agent 和用户审计：
-   ```
-   table_url.url: "https://prod.api.example.com/cb"   # source: 用户提供 @ 2026-04-14 14:32
-   intercept.url: "<PLACEHOLDER: 拦截回调地址>"        # source: 用户授权占位 @ 2026-04-14 14:35
-   ```
-   未标注 source 的 URL 视为违反协议，reviewer 将判定为疑似编造。
-
-#### 与下游防御的责任划分
-
-| 层 | 防什么 | 局限 |
-|---|---|---|
-| **plan 协议（本节）**：写入时禁自创 | AI 不写不该写的（前置） | 依赖 AI 守纪律 |
-| **apply A0.5 模式 lint** | 已知假特征命中即硬阻止（兜底，不允许占位） | 看不到"像真的假" |
-| **reviewer agent 溯源审计** | URL 值 vs 对话历史比对 | 需要独立 subagent |
-| **用户终审** | 涉及 url 的不可逆操作 | 最后一道闸 |
-
-四层不重叠、不互相覆盖。本节是**最强一层**——堵住源头比事后检测更有效。
-
-#### AI 的认知锚点
-
-> "我没有用户的 ground truth，我永远不'善意默认'。
-> 没有用户输入就停下来问，**不存在'先填一个看起来合理的，跑不通再说'的中间状态**。"
-
-### 变量声明触发数据接口询问的细化规则（CRITICAL — 防调试时空白列）
-
-**覆盖范围**：任何**共享 `PlatformWebForControl.table_cell.dslSchema`** 的 DSL（目前是 `control.table_cell` 和 `customField.table_layout`，未来若新增使用同一 dslSchema 的点位类型**自动覆盖**，不要把规则硬编码成只认 control）。
-
-**判定算法**：
-1. 取到该点位的 DSL 对象（归一化前后都行）
-2. 判断以下任一条件为真即为"有数据变量"：
-   - DSL 是完整对象形态 `{definitions, template}` 且 `definitions.data` 非空
-   - DSL 是裸 template 形态但 template（递归地）里出现非 `$container` / `$i18n` / `$colorTokens` / `$fieldValue` 前缀的 `{{x}}` 引用 —— **这是非法状态**，应先引导用户补 definitions 再问 URL
-   - DSL 是 JSON 字符串形态 → 解析一次后重复上述判断
-3. 判定"有数据变量"的点位，配套的数据接口 URL 字段：
-   - control → `platform.web.table_url.url`
-   - customField → `platform.web.table_data_url`
-4. 按"Runtime URL 统一询问流程"的话术询问
-
-**为什么必须问**：
-- 数据接口是**表格列每次渲染都会打**的，不是一次性事件
-- template 里的 `{{varName}}` 值由 `work_item_datas[].work_item_data.{varName}` 填充
-- URL 不可达或返回格式错 → 变量 undefined → 整列空白/报错；用户最常踩的调试坑
-- 只过 schema 的假 URL（如 `example.com`）能 push 成功，但跑起来每一行都废
-
-### 各类型的行为指引（schema 抓不到，必须 AI 主动遵守）
-
-> 字段必填 / 长度 / 格式 / 枚举合法性由 `local-config set` 的 schema 校验兜底——不在此处重复。下表只列 **schema 过了但语义上仍会跑废** 的点，AI 写配置前必须按此执行。
-
-| 类型 | 行为指引 |
-|------|---------|
-| control | URL 询问（`control.url` / `table_url.url` / 节点内 `httpRequest.params.url`）走"Runtime URL 统一询问流程"；`table_cell.definitions.data` 非空即视为"有数据变量"，触发数据接口 URL 必填联动 |
-| intercept | `url` 必须向用户询问（schema 抓不到编造）；`event_config.work_item_type` 与 `event_type` 的数字编号 AI 易编错，必须来源于用户或 schema 枚举，禁止凭记忆填 |
-| listen_event | `url` 必须向用户询问；`event_config` 同 intercept |
-| component | `component_type` 只能从 schema 枚举取，禁止脑补"看起来像"的值（目前仅支持轻应用） |
-| customField | URL 询问（`table_data_url` / 节点内 `httpRequest.params.url`）同 control；`subfield.name` 非必填时留空由 CLI 从 `i18n_info.zh.name` 取值，AI 不要自作主张另填 |
-| liteAppComponent | **仅限本阶段填 properties/outputs 的 propType 选型 / 数据源限制**：MUST 先调飞书项目知识 MCP（关键词 `轻应用组件 LiteAppComponent 属性 getProps notify watch 输出属性`）确认 propType 枚举、spaceId → 工作项类型 → 字段结构、排期不支持等**声明端**限制（schema 抓不到）；【过渡期 / 模拟 RAG 用，MCP 正式上线后删除此段】MCP 未命中则 fallback 读 `log/builder-comp-rag-doc.md`；发布后 property 类型不可改，定义阶段要一次问清。**⚠️ 本条规则不串到 plugin-code-gen 阶段**——写代码时以 `plugin-code-gen/references/point-types/liteAppComponent/` 点位 doc 为主源，MCP 退为业务语义兜底（见 plugin-code-gen plan.md 的查询顺序） |
-
-> 其他类型（page / view / dashboard / config / button）的必填字段全部可由 schema 校验抓住，AI 按 schema 报错提示修即可，plan 阶段不需要特殊行为指引。
-
-### 对于删除操作
-
-1. 从 `plugin.temp.local-remote.json` 中列出匹配的候选点位
-2. 展示候选列表，让用户确认要删除哪个
-3. **二次确认删除**，展示点位详情后请求确认
 
 ### 对于修改操作
 
-1. 从 `plugin.temp.local-remote.json` 找到目标点位
+1. jq 定位目标点位（不要 Read 整文件）：`jq '.<type>[] | select(.key=="<key>")' .lpm-cache/config/remote.json`
 2. 仅询问需要修改的字段
 3. 其余字段保持原值
 
 ## P4：生成完整配置文件
 
-**⚠️ CRITICAL：set 是全量替换，必须基于 `get --remote` 拉取的远端完整数据操作。遗漏任何现有点位都会导致被永久删除。**
-
-基于 `plugin.temp.local-remote.json` 的全量配置：
+> set 是全量替换（详见 [`../SKILL.md`](../SKILL.md#全量提交约束critical--防数据丢失)）——基于 `.lpm-cache/config/remote.json` 的远端全量配置操作，而不是只传变更部分。
 
 ### 添加操作
 
@@ -215,7 +148,7 @@ page | view | dashboard | config | control | button | intercept | listen_event |
 结果: { "page": [A], "button": [B1, B2], "liteAppComponent": [新点位] }
 ```
 
-对于 Single 类型（page/view/dashboard/config/intercept/listen_event/component），如果远端已有该类型的点位，**不能再添加**（maxItems=1）。应提示用户是要替换还是修改现有点位。
+对于 Single 类型（page/view/dashboard/config/intercept/listen_event/component），如果远端已有该类型的点位，不能再添加（maxItems=1，schema 会拒绝）。应提示用户是要替换还是修改现有点位。
 
 ### 修改操作
 
@@ -240,11 +173,11 @@ page | view | dashboard | config | control | button | intercept | listen_event |
 结果: { "page": [A] }
 ```
 
-**⚠️ 如果只传 `{ "liteAppComponent": [新点位] }` 而不包含 page 和 button，远端的 page 和 button 将被清除！**
+（如果只传 `{ "liteAppComponent": [新点位] }` 而不包含 page 和 button，远端的 page 和 button 会被清除。）
 
-**删除确认规则：** 生成的完整 JSON 相比远端减少了任何点位时，**必须先向用户列出即将被删除的点位清单（key + name），获得明确确认后才能执行 set。** 禁止静默删除。
+**删除确认规则**：生成的完整 JSON 相比远端减少了任何点位时，先向用户列出被删除的点位清单（key + name）并获得确认，再执行 set——不要静默删除。
 
-生成文件名：`plugin.temp.local-{YYYY-MM-DD_HHmmss}.json`
+生成文件名：`.lpm-cache/config/draft-{YYYY-MM-DD_HHmmss}.json`
 
 ### 生成前自检
 
@@ -254,19 +187,12 @@ page | view | dashboard | config | control | button | intercept | listen_event |
 - [ ] 必填字段均已填写
 - [ ] 枚举值合法（mode、mobile_block_style、field_type、view.icon）
 - [ ] name 长度在限制内
-- [ ] **platform.web 字段以 schema 中对应 `PlatformWebFor{Type}` 定义为准，禁止跨点位类型混用**（如 `table_url` 属于 customField，不能写在 control 里；`mode`/`init_size` 属于 button，不能写在其他类型里）
+- [ ] platform.web 字段按当前点位类型对应的 `PlatformWebFor{Type}` 取（例：`table_url` 是 customField 专有，`mode`/`init_size` 是 button 专有，不跨类型混用）
 
-## P5：清理临时文件（强制）
-
-> **MUST — 此步骤不可跳过。** `plugin.temp.local-remote.json` 仅在 plan 阶段使用，生成配置文件后立即删除。
-> `point-schema.json` 在后续 polish 阶段仍需参考，此处保留，发布完成后由 plugin-publish 统一清理。
-
-```bash
-rm -f plugin.temp.local-remote.json
-```
-
-## P6：输出
+## P5：输出
 
 plan 阶段完成后输出：
-- 生成的配置文件路径：`plugin.temp.local-{timestamp}.json`
+- 生成的配置文件路径：`.lpm-cache/config/draft-{timestamp}.json`
 - 变更摘要：添加/修改/删除了哪些点位（类型 + key）
+
+> 中间产物（`.lpm-cache/config/remote.json` / `draft-*.json` / `schema/point-schema.json` / `mcp/*.md`）由 CLI 在 `local-config set` / `update` / `publish` 成功后自动清理，skill 不负责清理。

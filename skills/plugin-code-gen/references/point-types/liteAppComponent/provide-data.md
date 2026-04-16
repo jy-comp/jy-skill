@@ -5,7 +5,7 @@
 **触发**：用户需要联动下游组件按自己的筛选展示。
 
 ## 1. 定义输出属性
-组件需要一个 `dataSet` 类型的 output（声明路径见 plan.md）。`notify(propKey, ...)` 的 `propKey` **就是这里声明的输出属性 key**——读 `plugin.temp.local-remote.json` 的 `outputs[].propKey` 确认，禁止编造。
+组件需要一个 `dataSet` 类型的 output（声明路径见 plan.md）。`notify(propKey, ...)` 的 `propKey` **就是这里声明的输出属性 key**——读工程根 `point.config.local.json` 的 `liteAppComponent[].outputs[].propKey` 确认，禁止编造。
 ⚠️ 输出属性**没有字段类型**——想让下游拿字段数据，只能推包含筛选条件的 moql，下游自己查。
 
 ## 2. 定位字段（复用 consume-data.md 步骤 2）

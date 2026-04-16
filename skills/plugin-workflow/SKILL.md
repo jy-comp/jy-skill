@@ -20,24 +20,25 @@ metadata:
 **用户不需要知道"插件开发"的概念。** 用户只需要说"我想要一个 xxx 功能"，AI 判断这个功能需要自定义插件来承载，然后自动完成从创建到发布的全部流程。
 
 用户全程只需要在关键节点做确认：
-1. 确认功能理解是否正确
-2. 确认 AI 推荐的点位方案（基于 schema 分析）
-3. 本地预览调试后确认功能是否 OK
-4. 确认发布
+1. 确认 AI 推荐的点位方案（基于 schema 分析）
+2. 本地预览调试后确认功能是否 OK
+3. 确认发布
 
 ## 完整流程
 
-1. **Phase 0 — 确认站点上下文** → 询问用户 siteDomain（MUST，禁止默认）
-2. **Phase 1 — 理解需求** → 确认功能（不涉及点位）
-3. **Phase 2 — 搭建工程** → env-setup（按需）/ plugin-create / schema / 点位方案确认 / meego-point-config
+1. **Phase 0 — 采集上下文** → 站点域名 + 用户原始需求（一句话即可，禁止展开确认模板）
+2. **Phase 1 — 搭建工程** → env-setup（按需）/ plugin-create，产出可运行的插件骨架
+3. **Phase 2 — 点位配置** → 拉 schema / 推荐点位 / meego-point-config
 4. **Phase 3 — 实现功能** → plugin-code-gen / 本地调试 / 功能确认
 5. **Phase 4 — 发布上线** → plugin-polish / plugin-publish
+
+**需求是上下文数据，不是阶段**：`context.originalRequirement` 在 Phase 0 采集，后续每个 Phase 从 checkpoint 读原文、在各自数据源（schema / point-type doc / MCP / types）到位时才做校验，避免提前确认或凭空推导。
 
 ## 各阶段详细流程
 
 - Phase 0 → 读取 `references/phase-0-context.md`
-- Phase 1 → 读取 `references/phase-1-understand.md`
-- Phase 2 → 读取 `references/phase-2-scaffold.md`
+- Phase 1 → 读取 `references/phase-1-scaffold.md`
+- Phase 2 → 读取 `references/phase-2-point-config.md`
 - Phase 3 → 读取 `references/phase-3-implement.md`
 - Phase 4 → 读取 `references/phase-4-release.md`
 
@@ -45,15 +46,15 @@ metadata:
 
 ```
 /plugin-workflow                        # 端到端全流程（推荐）
-/plugin-workflow phase=1                # 仅需求分析
-/plugin-workflow phase=2                # 仅搭建工程
+/plugin-workflow phase=1                # 仅搭建工程
+/plugin-workflow phase=2                # 仅点位配置
 /plugin-workflow phase=3                # 仅实现功能
 /plugin-workflow phase=4                # 仅发布上线
 ```
 
 ## 进度追踪（Checkpoint 机制）
 
-每次执行 CLI 命令或关键步骤前后，**MUST** 更新项目根目录的 `.plugin-workflow-state.json`，使中断后能精确恢复。
+每次执行 CLI 命令或关键步骤前后，**MUST** 更新项目根目录的 `.lpm-cache/state.json`，使中断后能精确恢复。
 
 ### 文件格式
 
@@ -81,12 +82,12 @@ metadata:
 | 执行 CLI 命令**前** | 写入 `nextCommand` + `nextStep`，`lastCommandStatus` 设为 `"running"` |
 | 执行 CLI 命令**后** | 写入 `lastCommand` = 刚执行的命令，`lastCommandStatus` = `"success"` / `"failed"` |
 | 进入新 Phase/Step | 更新 `phase` + `step` + `stepName` |
-| Phase 4 发布成功 | 删除 `.plugin-workflow-state.json`（流程已完成） |
+| Phase 4 发布成功 | 删除 `.lpm-cache/state.json`（流程已完成） |
 
 ### 恢复规则
 
 每次 workflow 启动时：
-1. 检查 `.plugin-workflow-state.json` 是否存在
+1. 检查 `.lpm-cache/state.json` 是否存在
 2. 存在时向用户展示恢复摘要：
    ```
    📍 上次执行到 Phase {phase} — {stepName}

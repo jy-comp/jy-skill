@@ -67,11 +67,19 @@ Token 按域名生效，确定 `siteDomain` 的优先级：
 
 ## 安全规则
 
-- **禁止修改 `.lpm/` 目录下的任何文件**：`.lpm/` 目录由 CLI 内部管理（如 `auth.json`、缓存等），禁止通过 Edit/Write 工具或任何方式直接修改其中的文件，只能通过 CLI 命令间接操作。此禁令仅限 `.lpm/` 目录内部，不扩展到项目根其它文件。
+- **`.lpm/` 目录由 CLI 内部管理**（`auth.json`、缓存等），不要用 Edit/Write 直接改，只能通过 CLI 命令间接操作。此限制仅限 `.lpm/` 目录内部。
+- **`plugin.config.json` 由 CLI 维护**：点位信息通过 `local-config set` + `update --source-type=remote` 同步，`resources` 数组里的 `id` / `entry` 由 `update` 生成。不要用 Edit/Write 直接改这个文件——手工改 CLI 下次 update 会对不上。其他 skill 需要点位信息时读它、不写它。
 - **禁止输出密钥**（accessToken、pluginSecret）到终端明文
 - **写入/删除操作前必须确认用户意图**（如发布、删除点位等不可逆操作）
-- **全量提交约束**：`local-config set` 和 `update --source-type=local` 均为全量操作，禁止只传变更部分
-- **删除点位确认（CRITICAL — 适用于所有阶段和所有调用路径）**：在执行 `local-config set` 之前，**MUST** 对比即将提交的 JSON 与远端配置（`local-config get --remote`）。如果提交的 JSON 相比远端**减少了任何点位**（整个类型缺失或某个 key 缺失），**必须立即暂停，向用户列出即将被删除的点位清单（类型 + key + name），获得明确确认后才能执行 set。禁止静默删除。** 此规则无论从 plan、apply、pipeline 还是 plugin-workflow 任何路径进入均须执行，不可跳过。
+- **全量提交约束**：`local-config set` 和 `update --source-type=local` 均为全量操作，不要只传变更部分（未传的点位会被永久删除）
+
+### 删除点位前置检查协议（CRITICAL — 适用于所有阶段和所有调用路径）
+
+执行 `local-config set` 之前，对比即将提交的 JSON 与远端配置（`local-config get --remote`）。如果提交的 JSON 相比远端**减少了任何点位**（整个类型缺失或某个 key 缺失），**立即暂停**，向用户列出被删除的点位清单（类型 + key + name），获得明确确认后才能执行 set。不要静默删除。
+
+此检查是 mode-agnostic 的前置 gate——无论从 plan / apply / pipeline / plugin-workflow 哪条路径进入，都要走一次。以下 skill 的 plan/apply 是已知执行点，须各自落实：
+- `meego-point-config/references/apply.md` A0 步骤
+- `plugin-workflow` phase-2 调用 meego-point-config 时由被调方执行（编排层不重复检查）
 
 ### 无源即停（CRITICAL — 全局通则，统御所有"溯源协议"）
 
@@ -126,10 +134,6 @@ C. 提供检索关键词，我重新查（可能找错了）
 - 代码溯源：`plugin-code-gen/references/plan.md` 的 "代码溯源协议"
 - 后续新场景（如自定义脚本生成、SQL 生成等）应继承此通则各自落实
 
-**核心信念（写进 AI 的认知锚点）**：
-> "我没有用户的 ground truth，我永远不'善意默认'。
-> 没有合法信息源就停下来问用户，**不存在'先写一个看起来合理的，跑不通再改'的中间状态**。"
-
 ### 禁止编造 URL（CRITICAL — "无源即停"通则的 URL 落地）
 
 **绝对禁止编造任何 URL 或图标地址。** 编造的 mock URL 在运行时完全不可用，会导致插件功能失效。AI 永远不主动创造 URL 字符串——每个值必须来自"用户显式输入"或"用户授权占位"。
@@ -148,7 +152,7 @@ C. 提供检索关键词，我重新查（可能找错了）
 
 ## Checkpoint（进度追踪）
 
-**判断规则**：子 skill 执行前读项目根 `.plugin-workflow-state.json`：
+**判断规则**：子 skill 执行前读项目根 `.lpm-cache/state.json`：
 - **存在** → 处于 workflow 编排中，按 [`references/checkpoint.md`](references/checkpoint.md) 的协议在每个 CLI 命令前后更新 checkpoint
 - **不存在** → 独立调用，不写 checkpoint
 

@@ -50,7 +50,7 @@ metadata:
 | "推送配置" / "推到远端" | `update --source-type=local` | [同步配置](#同步配置) |
 | "查看点位配置" / "当前配置" | `local-config get` | [点位配置](#点位配置管理) |
 | "查看远端配置" | `local-config get --remote` | [点位配置](#点位配置管理) |
-| "生成 schema" / "看看有哪些点位类型" | `schema > point-schema.yaml` | [生成 Schema](#生成-schema) |
+| "生成 schema" / "看看有哪些点位类型" | `schema` | [生成 Schema](#生成-schema) |
 | "查看分类" / "有哪些分类" | `list-categories` | [分类列表](#分类列表) |
 | "登录" / "认证" / "设置 token" | `login` | [登录认证](#登录认证) |
 
@@ -76,7 +76,7 @@ metadata:
 ### 诊断步骤
 
 1. 读取 `plugin.config.json` → 提取 pluginId、siteDomain、resources
-2. 读取 `.plugin-workflow-state.json`（如存在）→ 获取上次执行进度
+2. 读取 `.lpm-cache/state.json`（如存在）→ 获取上次执行进度
 3. 检查 `src/features/` 目录 → 判断代码是否已生成
 4. 检查 `node_modules/` → 判断依赖是否已安装
 
@@ -89,7 +89,7 @@ metadata:
 | 有 `plugin.config.json`，`resources` 非空，无 `src/features/` | 已配置，未生成代码 | → `/plugin-code-gen` 生成代码 |
 | 有 `src/features/` 但代码为模板 | 已生成模板，未实现功能 | → `/plugin-code-gen mode=apply` 填充功能 |
 | 有 `src/features/` 且代码已实现 | 可调试或发布 | `start --auto` 调试 或 → `/plugin-publish` 发布 |
-| `.plugin-workflow-state.json` 存在 | workflow 中断 | 展示上次进度，引导继续（详见 checkpoint 恢复） |
+| `.lpm-cache/state.json` 存在 | workflow 中断 | 展示上次进度，引导继续（详见 checkpoint 恢复） |
 
 ### 输出格式
 
@@ -99,7 +99,7 @@ metadata:
    站点：https://meego.feishu-boe.cn
    点位资源：3 个（board_web × 1, button_web × 1, control_web × 1）
    代码状态：已实现（src/features/ 下 3 个目录）
-   上次进度：Phase {phase} — {stepName}（来自 .plugin-workflow-state.json；字段定义见 plugin-workflow/SKILL.md 的"Checkpoint 文件格式"）
+   上次进度：Phase {phase} — {stepName}（来自 .lpm-cache/state.json；字段定义见 plugin-workflow/SKILL.md 的"Checkpoint 文件格式"）
    最近命令：{lastCommand} → {lastCommandStatus}
    
    建议：运行 `npx @byted-meego/cli@builder start --auto` 继续调试
@@ -289,22 +289,24 @@ npx @byted-meego/cli@builder update-description \
 ### 点位配置管理
 
 ```bash
-# 查看当前本地配置
-npx @byted-meego/cli@builder local-config get
-
-# 查看远端配置
+# 写入远端配置到 .lpm-cache/config/remote.json
 npx @byted-meego/cli@builder local-config get --remote
 
-# 设置点位配置（全量替换，JSON 字符串）
-npx @byted-meego/cli@builder local-config set --config '<完整 JSON>'
+# 推送 draft（全量替换语义）。成功后 CLI 会：
+#   1) 删除该 draft 和 .lpm-cache/config/remote.json（已消费的基线）
+#   2) 把新的完整配置写入工程根 point.config.local.json（下游 code-gen / polish 读这里）
+npx @byted-meego/cli@builder local-config set --from .lpm-cache/config/draft-<timestamp>.json
 ```
+
+- `get` / `schema` 的 stdout 只回一行相对路径，JSON 落在 `.lpm-cache/` 里；AI 通过 `jq` / Read 按需取片段，不要把整份 JSON 带进对话 context
+- `set` 只接受 `--from <path>`（相对或绝对），不再接受 inline JSON
 
 **全量替换语义（CRITICAL）**：`local-config set` 是**全量覆盖**，必须传完整配置（所有点位），不能只传变更部分。遗漏任何现有点位都会导致该点位被永久删除。详见 [`../meego-shared/SKILL.md`](../meego-shared/SKILL.md) 的"全量提交约束"与"删除点位确认"条款。
 
 **典型流程**：
 1. `local-config get --remote` → 获取远端当前完整配置
 2. 在完整配置基础上增删改
-3. `local-config set --config '<修改后的完整 JSON>'` → 校验 + 写入本地
+3. `local-config set --from <draft-path>` → 校验 + 写入本地
 4. `update --source-type=local` → 推送到远端
 5. `update` → 拉取远端配置同步回本地
 
@@ -313,10 +315,20 @@ npx @byted-meego/cli@builder local-config set --config '<完整 JSON>'
 ### 生成 Schema
 
 ```bash
-npx @byted-meego/cli@builder schema > point-schema.yaml
+npx @byted-meego/cli@builder schema
 ```
 
-生成点位配置的 JSON Schema，用于参考各点位类型的字段定义和约束。
+CLI 把 JSON Schema 写入 `.lpm-cache/schema/point-schema.json` 并在 stdout 回显路径。用 `jq` 按需切片，**不要 Read 整个文件**（约 30K tokens）。
+
+### 清理工作区（兜底）
+
+```bash
+npx @byted-meego/cli@builder workspace clean --scope=all          # 清全部（保留 state.json）
+npx @byted-meego/cli@builder workspace clean --scope=mcp          # 只清 MCP 缓存
+npx @byted-meego/cli@builder workspace clean --include-state      # 连 workflow checkpoint 一起清
+```
+
+`.lpm-cache/` 的生命周期由 CLI 自动维护——`local-config set` / `update` / `publish` 成功时会按子目录清理。仅在中断后需要强制重置时才手动调用 `workspace clean`。
 
 ### 分类列表
 

@@ -5,63 +5,100 @@
 
 ## P0：点位配置的声明边界（CRITICAL — 本 skill 不管声明）
 
-本 skill **只写代码**，不管 properties / outputs / 点位字段的**声明**——那是 `meego-point-config` skill 的职责。
+本 skill **只写代码方案**，properties / outputs / 点位字段 / 能力开关的**声明**归 `meego-point-config` 管。
 
-- Phase 2.4 已跑 meego-point-config 后，远端点位配置就绪，本地快照：`plugin.temp.local-remote.json`（缺就跑 `npx @byted-meego/cli@builder local-config get > plugin.temp.local-remote.json`）
-- 代码里的 `propKey`（用在 `getProps()[propKey]` / `getDataSourceResult(propKey, ...)` / `notify(propKey, ...)` 等位置）**必须是快照里已声明的 propKey**，不是 AI 自创
-- **发现缺 propKey 或 propType 不合适** → 停下告诉用户"需要新增/修改属性 X，请先调 `/meego-point-config` 完成声明后再回来"。**禁止**自己编辑 `plugin.config.json` / **禁止**自己跑 `local-config set`
+plan 阶段本质是"**理解用户意图 → 匹配点位能力能否实现**"——读 doc 时判断当前点位提供的能力能不能覆盖用户要的功能，这个过程常常会**反向发现上游配置缺口**：代码能写出来，但没有对应的点位配置支持时运行不起来。发现缺口的第一时间停下，让用户回去跑 `/meego-point-config` 补齐再回来，不要自己跑 `local-config set`，也不要直接改 `plugin.config.json`（见 [`../../meego-shared/SKILL.md`](../../meego-shared/SKILL.md#安全规则)）。
 
-## P1：读取已有模板代码
+**前置数据**：Phase 2 已跑 meego-point-config 并经 `update --source-type=remote` 同步，**点位配置的权威快照是工程根目录的 `point.config.local.json`**（CLI 在 `local-config set` 成功时写入，`update` 拉取时刷新；`.lpm-cache/config/remote.json` 在 `set` 成功时已被 CLI 删除，不要再找）。若 `point.config.local.json` 缺失或过期，重新跑 `npx @byted-meego/cli@builder update` 同步一次即可。
 
-从 `plugin.config.json` 的 `resources` 数组读取各点位的 entry 路径，Read 每个 entry 文件，了解 CLI 已生成的代码结构、导出方式、初始化逻辑。
+**常见缺口模式**（见一个就停下、回流 meego-point-config，不要自己补）：
+
+| 缺口类型 | 具体表现 | 典型场景 |
+|---|---|---|
+| 属性未声明 | 代码里用到的 `propKey`（`getProps()[propKey]` / `getDataSourceResult(propKey, ...)` / `notify(propKey, ...)`）在 `point.config.local.json` 里找不到 | 轻应用组件需要消费/提供某个配置，但 `properties` 数组里没这项 |
+| 属性类型不对 | propKey 在，但 `prop_type` 与代码用法不匹配（如想当 `dataSource` 消费，实际声明成 `text`） | 属性类型选错，API 调用无法生效 |
+| 能力开关未启用 | 快照里某个属性的功能开关没开（如 `dataSource` 属性缺 `withField: true`，导致无法按字段级消费数据源） | liteAppComponent 想消费数据源里的具体字段，代码走 `withField` 但配置没开 |
+| 订阅/事件未声明 | 代码想监听某类事件，但 `listen_event` 里没声明对应 `event_type` | 拦截器 / 事件监听型点位代码走通了但不会被触发 |
+| 子字段未声明 | customField 代码用到某个 subfield，快照里没有 | 字段模板缺 subfield 声明 |
+
+判断流程：**不要 Read 整个 `point.config.local.json` 进上下文**（点位多时 JSON 很大）。用 jq 按要判断的东西按需取：
+
+```bash
+# 某点位某 propKey 的完整声明（propKey 缺失 / prop_type 不对 / 能力开关未开 都能一眼看出来）
+jq --arg t "liteAppComponent" --arg k "<点位key>" --arg p "<propKey>" \
+  '.[$t][] | select(.key==$k) | .properties[] | select(.prop_key==$p)' \
+  point.config.local.json
+
+# 某点位声明了哪些 propKey（想确认 prop 是否存在时）
+jq --arg t "liteAppComponent" --arg k "<点位key>" \
+  '.[$t][] | select(.key==$k) | .properties | map(.prop_key)' \
+  point.config.local.json
+
+# 某类型下某点位的整张声明（仅在需要完整视图时）
+jq --arg t "liteAppComponent" --arg k "<点位key>" \
+  '.[$t][] | select(.key==$k)' point.config.local.json
+```
+
+**代码里的 `propKey` 必须是 `point.config.local.json` 里已声明的，不是 AI 自创。**
+
+## P1：读取要实现代码的 entry 文件
+
+用 jq 从 `plugin.config.json` 取 entry 路径（不要 Read 整份 `plugin.config.json`）：
+
+```bash
+jq -r '.resources[] | "\(.id)\t\(.entry)"' plugin.config.json
+```
+
+然后 Read 每个 entry 文件（单文件体量小，Read 整份 OK），了解 CLI 已生成的代码结构、导出方式、初始化逻辑。
 
 ## P2：查能力（按点位开发的真实动线）
 
 ### 2.1 定位点位类型
 
-从 `plugin.config.json` 的 `resources[].type` 读出要开发的点位类型（如 `liteAppComponent` / `control` / `customField` 等），作为后续 2.2 的锚点。
+用 jq 从 `plugin.config.json` 取本次要开发的点位类型：
 
-### 2.2 查询顺序（严格时序，禁止跳步并行）
+```bash
+jq -r '.resources[].type' plugin.config.json | sort -u
+```
 
-**Step 1 — Read 点位专属 doc（有就必须先读完再进下一步）**
+作为后续 2.2 的锚点。
 
-doc 是本点位的**流程 / 场景 / 跨 API 协同 / 踩坑**指南，是主骨架，照抄流程步骤不拆散重组：
+### 2.2 查询顺序
+
+doc → types → MCP → 无源即停。**doc 是主源，types 和 MCP 是定义层补充**：doc 同时回答"**场景能力 + 用哪些 API + 怎么组合 API**"三件事；types 只讲 API 签名，MCP 讲产品语义 + API 定义说明——这两者帮你把 doc 里看到的业务名词和 API 用法对号入座，不帮你选型、不讲组合顺序。
+
+**Step 1 — 点位标准能力 doc（有就先读完再进下一步）**
+
+doc 是业务侧给出的本点位**标准能力说明**：讲这个点位能做什么场景、要调哪些 API、API 之间的组合顺序、propKey vs fieldKey 归属、订阅协议。读 doc 同时要判断：用户想要的功能**是不是这个点位标准能力覆盖的范围**？如果代码能写但需要点位配置侧的某个开关/声明支持（典型如消费数据源字段要 `withField`），回流到 P0 的缺口模式处理，不要假设"配置默认开着"。
 
 | 点位类型 | doc 路径 |
 |---|---|
-| `liteAppComponent` | `references/point-types/liteAppComponent/` 目录：先 Read `index.md`，按用户需求 Read `consume-data.md` / `provide-data.md` / `consume-props.md` 中的一份或多份；**禁止预加载全部场景** |
-| 其他点位 | 待补（当前版本暂无场景指南，跳到 Step 4 兜底） |
+| `liteAppComponent` | `references/point-types/liteAppComponent/` 目录：先 Read `index.md`，按用户需求 Read `consume-data.md` / `provide-data.md` / `consume-props.md` 中的一份或多份（预加载全部场景浪费 context，按需读） |
+| 其他点位 | 当前版本暂无，跳到 Step 4 兜底 |
 
 **Step 2 — 按 doc 指向查 `@lark-project/js-sdk/dist/types/index.d.ts`**
 
-校准 doc 里提到的 API 签名（存在性 / 参数 / 返回值）。types 里没写的方法 = 不存在，禁止反推。
+types 是 API 签名（存在性 / 参数 / 返回值）的唯一权威。types 里没写的方法 = 不存在——不要从"既然有 read 应该有 write"反推，也不要从 `plugin.config.json` 的 schema 字段名推 SDK 方法（schema 是配置约束，不是 SDK 接口）。
 
 **Step 3 — 仅当 doc + types 没覆盖业务语义时查飞书项目知识 MCP**
 
-MCP 只在以下场景查：枚举含义、参数取值空间、业务概念解释。**禁止用于**：API 签名（走 types）、API 组合流程（走 doc）、propKey/fieldKey 归属（走 doc）。
+MCP 只负责业务语义：枚举含义、参数取值空间、业务概念解释。**API 签名走 types、API 组合走 doc、propKey/fieldKey 归属走 doc**——MCP 对这三类问题只会返回碎片，拼起来像对其实没对。
+
+**MCP 缓存协议**：返回后立即 Write 到 `.lpm-cache/mcp/<slug>.md`，回复只给路径 + ≤100 字摘要（原文回流会炸 context）；同一查询先 Read 缓存，7 天以上视为过期重拉。CLI 在 create/init 时自动把 `.lpm-cache/` 写入 `.gitignore`，并在 `local-config set` / `update` / `publish` 成功后按子目录清理，AI 只负责写入、不负责清理。
 
 **Step 4 — doc 缺失的兜底**
 
-本点位无专属 doc 时，只靠 types + MCP 两源开发。若两源也拿不到可用线索 → 按 meego-shared "无源即停"停下问用户。**禁止**凭经验直接写 `window.JSSDK.xxx`。
+本点位无专属 doc 时，只靠 types + MCP 两源开发。两源都拿不到线索 → 走 meego-shared 的"无源即停"停下问用户，不要凭经验直接写 `window.JSSDK.xxx`——这类猜测能过 tsc 但运行时全废。
 
-### 2.3 冲突裁决（只用于两源矛盾时，不是查询顺序）
+### 2.3 冲突裁决（两源矛盾时用）
 
-**冲突优先级**：types > doc > MCP。signature 不一致（SDK 升级）→ 以 types 为准并提醒用户 doc 可能过期。
+**优先级**：types > doc > MCP。signature 不一致（SDK 升级）→ 以 types 为准并提醒用户 doc 可能过期。
 
-**为什么 doc 必须先读**：单查 MCP 片段或 types 签名，拼不出"API 组合顺序 / propKey vs fieldKey 归属 / 订阅协议约束"这类跨 API 约束，容易凑出**能过 tsc 但运行时跑废**的代码（典型：把 propKey 当 fieldKey 用、getDataSourceResult 忘了配 watch 刷新、notify 推数组而非 moql）。
+跳过 doc 直接拼 API 是最常见的失败模式，踩过的坑：**把 propKey 当 fieldKey 用 / `getDataSourceResult` 忘了配 watch 刷新 / `notify` 推数组而非 moql**——这些 types 签名完全合法、tsc 检查全过、运行时全挂。
 
-**禁止**：types 里没写的方法"应该有"反推、MCP 模糊片段补全、凭经验写 `window.JSSDK.xxx`、跳过点位 doc 直接组装 API 调用。
+## P3：源标注（reviewer 可审计）
 
-## P3：代码反模式清单（本 skill 专属黑名单）
-
-禁止以下退化推断：
-
-- ❌ 用 `plugin.config.json` 的 schema 字段名脑补 SDK 方法（schema 是配置约束，不是 SDK 接口）
-- ❌ 从 TS 类型"应该有"反推（类型里没写的方法 = 不存在）
-- ❌ MCP 模糊片段补全 / 命名约定猜测（如 `getX` 配 `setX`）
-- ❌ 凭内置经验直接写 `window.JSSDK.xxx.xxx()`
-
-每段 SDK 调用必须在邻近注释标 source（reviewer 可审计）：
+每段 SDK 调用在邻近注释标 source：
 
 ```ts
 // source: js-sdk types/index.d.ts:Control.getCreateWorkItemFormItemValues

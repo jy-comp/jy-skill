@@ -1,6 +1,6 @@
 # mode=verify：TypeScript 语法预检 + 自动修复
 
-**Checkpoint 恢复检查**（仅在 `.plugin-workflow-state.json` 存在时）：
+**Checkpoint 恢复检查**（仅在 `.lpm-cache/state.json` 存在时）：
 - `lastCommand` 含 `tsc` + `"success"` → 语法已通过，跳到 V4 引导调试
 - `lastCommand` 含 `tsc` + `"failed"` + `context.tscRound=1` → 从第 2 轮修复继续
 - `lastCommand` 含 `tsc` + `"failed"` + `context.tscRound=2` → 进入 V3 降级兜底

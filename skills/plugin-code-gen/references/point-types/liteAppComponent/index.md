@@ -29,7 +29,7 @@
 
 ## 共享前置（所有场景都要遵守）
 
-- **propKey 来源**：`getProps()[propKey]` / `getDataSourceResult(propKey, ...)` / `notify(propKey, ...)` 里的 `propKey` **必须**是已声明的属性 key（声明路径见 plan.md P0），读 `plugin.temp.local-remote.json` 的 `properties[].propKey` / `outputs[].propKey` 确认；禁止编造
+- **propKey 来源**：`getProps()[propKey]` / `getDataSourceResult(propKey, ...)` / `notify(propKey, ...)` 里的 `propKey` **必须**是已声明的属性 key（声明路径见 plan.md P0），读工程根 `point.config.local.json` 的 `liteAppComponent[].properties[].propKey` / `liteAppComponent[].outputs[].propKey` 确认；禁止编造
 - **两套 key 别混**：propKey（开发者声明的属性 key）vs fieldKey（工作项字段 key）。具体见 `consume-data.md` 步骤 3 的命名空间表
 
 ## 附：非 API 值的溯源

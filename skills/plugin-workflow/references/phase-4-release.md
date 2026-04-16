@@ -2,7 +2,7 @@
 
 完善插件信息并发布。用户只需最终确认。
 
-> **Checkpoint**：本阶段每个子步骤执行前后都需要更新 `.plugin-workflow-state.json`。
+> **Checkpoint**：本阶段每个子步骤执行前后都需要更新 `.lpm-cache/state.json`。
 
 ## 4.1 完善信息 → plugin-polish
 
@@ -53,7 +53,7 @@ AI 基于已实现的代码和点位配置自动：
 
 ## 4.3 完成
 
-**发布成功后删除 `.plugin-workflow-state.json`**（流程已完结，无需保留 checkpoint）。
+**发布成功后删除 `.lpm-cache/state.json`**（流程已完结，无需保留 checkpoint）。
 
 ```
 🎉 插件发布成功！

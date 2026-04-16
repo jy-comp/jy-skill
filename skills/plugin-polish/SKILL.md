@@ -58,7 +58,7 @@ mode=pipeline（默认）→ analyze → generate → confirm → apply
 | 来源 | 用途 |
 |------|------|
 | `plugin.config.json` | pluginId、siteDomain |
-| `point-schema.yaml` 或点位配置 | 点位类型、名称、功能描述 |
+| `.lpm-cache/schema/point-schema.json` 或点位配置 | 点位类型、名称、功能描述 |
 | `src/` 代码文件 | 实际功能逻辑 |
 
 ## 输出

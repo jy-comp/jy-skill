@@ -1,9 +1,9 @@
 # mode=apply：同步配置 + 构建上传 + 版本发布
 
-**Checkpoint 恢复检查**（仅在 `.plugin-workflow-state.json` 存在时）：
+**Checkpoint 恢复检查**（仅在 `.lpm-cache/state.json` 存在时）：
 - `lastCommand` 含 `update` + `"success"` → 跳过 A1，直接执行 A2
 - `lastCommand` 含 `release` + `"success"` → 跳过 A1+A2，直接执行 A3（从 `context.productVersion` 获取版本号）
-- `lastCommand` 含 `publish` + `"success"` → 全部完成，跳到 A4 清理
+- `lastCommand` 含 `publish` + `"success"` → 全部完成，跳到 A4 输出
 - 其他 → 从 A1 开始
 
 ## A1：同步配置到后台（兜底）
@@ -103,7 +103,7 @@ npx @byted-meego/cli@builder publish \
 
 ### 成功
 
-**Checkpoint**：`{ lastCommand: "publish", lastCommandStatus: "success", nextStep: "A4 清理" }`
+**Checkpoint**：`{ lastCommand: "publish", lastCommandStatus: "success", nextStep: "A4 输出" }`
 
 `npx @byted-meego/cli@builder publish` 输出分享链接：
 
@@ -121,15 +121,7 @@ Plugin share url: https://meego.example.com/openapp/plugin_share?appKey=PL_xxx
 | 版本号已存在 | 自动 patch +1 重试，或提示用户指定版本号 |
 | 网络/权限错误 | 展示原始错误，告知用户可手动重试 |
 
-## A4：清理临时文件（强制）
-
-> **MUST — 此步骤不可跳过。** 发布完成后 `point-schema.yaml` 已无任何下游消费者，必须立即删除。
-
-```bash
-rm -f point-schema.yaml
-```
-
-## A5：输出
+## A4：输出
 
 ```
 ✅ 插件发布完成
@@ -137,3 +129,5 @@ rm -f point-schema.yaml
    发布版本：1.0.1（publish）
    分享链接：https://meego.example.com/openapp/plugin_share?appKey=PL_xxx
 ```
+
+> `publish` 成功时 CLI 会自动清理整个 `.lpm-cache/`（仅保留 `state.json` 供 workflow 断点恢复）；发布失败或用户中断则不清理，保留缓存便于续跑。AI 不需要手动 `rm`。
