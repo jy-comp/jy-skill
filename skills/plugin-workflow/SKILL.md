@@ -26,13 +26,13 @@ metadata:
 
 ## 完整流程
 
-1. **Phase 0 — 采集上下文** → 站点域名 + 用户原始需求（一句话即可，禁止展开确认模板）
+1. **Phase 0 — 确认站点域名 + 留存原话** → 钉死 `siteDomain`（CLI 硬前置）+ 逐字记录用户启动时说的那句话到 checkpoint（纯录音，零解析）
 2. **Phase 1 — 搭建工程** → env-setup（按需）/ plugin-create，产出可运行的插件骨架
-3. **Phase 2 — 点位配置** → 拉 schema / 推荐点位 / meego-point-config
+3. **Phase 2 — 点位配置** → 完整把用户意图交给 meego-point-config：意图识别 / 术语消歧 / 点位匹配 / schema 切片 / 用户确认 / URL 询问 / 推送配置
 4. **Phase 3 — 实现功能** → plugin-code-gen / 本地调试 / 功能确认
 5. **Phase 4 — 发布上线** → plugin-polish / plugin-publish
 
-**需求是上下文数据，不是阶段**：`context.originalRequirement` 在 Phase 0 采集，后续每个 Phase 从 checkpoint 读原文、在各自数据源（schema / point-type doc / MCP / types）到位时才做校验，避免提前确认或凭空推导。
+**Phase 0 只录音，Phase 2 / 3 才理解**：`context.originalRequirement` 在 Phase 0 逐字记录到 checkpoint，后续 Phase 2（meego-point-config 意图识别）和 Phase 3（plugin-code-gen 方案设计）从 checkpoint 读原话。编排层不对原话做任何解析、不推导默认值；各 Phase 的校验在自己真正需要的数据源（schema / point-type doc / MCP / types）到位时才做。
 
 ## 各阶段详细流程
 

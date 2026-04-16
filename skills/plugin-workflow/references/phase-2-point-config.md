@@ -1,6 +1,6 @@
 # Phase 2：点位配置
 
-把 Phase 0 采集的用户上下文交给 meego-point-config 处理。**编排层不预判、不拉 schema、不填默认值、不替用户做选型**——点位识别、schema 切片、用户交互确认、URL 询问、MCP 业务语义查询全部在 meego-point-config/references/plan.md 里完成。编排层这里插手哪一项，那一项的护栏就会被绕过。
+把控制权直接交给 meego-point-config。**编排层不预判、不拉 schema、不填默认值、不替用户做选型**——点位识别（包括意图理解 / 术语消歧 / mentionedPointType 提取）、schema 切片、用户交互确认、URL 询问、MCP 业务语义查询全部在 meego-point-config/references/plan.md 里完成。编排层这里插手哪一项，那一项的护栏就会被绕过。
 
 ## 2.1 调用 meego-point-config
 
@@ -8,10 +8,7 @@
 
 **恢复检查**：若从 checkpoint 恢复，读 `.lpm-cache/state.json` 里 meego-point-config 自己维护的子状态——由 meego-point-config 决定从哪一步继续，编排层不替它解读 `local-config set` / `update` 的成功与否。
 
-调用时把 Phase 0 采集的两项作为 hint 传入：
-
-- `context.originalRequirement` —— 用户原话（逐字），作为 P1 识别的输入
-- `context.mentionedPointType` —— 用户主动提到的点位类型或 null，作为 P1 的可选提示
+meego-point-config 的 P1 从 `.lpm-cache/state.json` 的 `context.originalRequirement` 读取用户原话做意图识别（Phase 0 逐字记录的版本，不受会话压缩影响），编排层不预消化、不传 hint 参数。
 
 ```
 调用 /meego-point-config mode=pipeline

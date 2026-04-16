@@ -120,8 +120,13 @@ const values = await window.JSSDK.control.getCreateWorkItemFormItemValues([...])
 
 ## P5：规划功能实现方案
 
+**读取用户原始需求**：被 plugin-workflow 编排时从 `.lpm-cache/state.json` 的 `context.originalRequirement` 读（Phase 0 逐字录音，不受会话压缩影响）；独立调用时从对话上下文读。
+
+结合原始需求 + P2 查到的点位能力，做方案设计：
+
 1. 分析用户需求涉及的 UI 组件、数据交互、状态管理
 2. 基于三源查询结果确认要用的 JSSDK API 和 FeatureContext 字段
-3. 规划代码修改方案——在模板基础上需要新增/修改哪些部分
+3. 对照 P0 缺口模式检查是否有配置缺口（若有 → 回流 meego-point-config）
+4. 规划代码修改方案——在模板基础上需要新增/修改哪些部分
 
 向用户确认实现方案后，进入 apply 阶段。

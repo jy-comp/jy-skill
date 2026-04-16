@@ -26,7 +26,11 @@
 - 飞书项目知识 MCP（查询 work_item_type 枚举值、event_type 编号等业务背景）
 - `.lpm-cache/schema/point-schema.json` 中的字段约束和枚举
 
-**若由 plugin-workflow 调用**：会收到 `context.originalRequirement`（用户原话，作为主输入）和可选的 `context.mentionedPointType`（用户主动提到的点位类型）。`mentionedPointType` 有值时直接按该类型走（只需用 schema 切片验证其存在），不再做推荐；为 null 时按常规流程做意图识别和术语消歧后向用户确认点位方案。无论哪条路径，key/name/description 等字段都在 P3 交互补全，不靠上游"推导默认值"。
+用户原话的读取方式：
+- **被 plugin-workflow 编排时**：从 `.lpm-cache/state.json` 的 `context.originalRequirement` 读（Phase 0 逐字记录的版本，不受会话压缩影响）
+- **独立调用时**：从当前对话上下文读
+
+Phase 0 只做逐字录音，P1 才是真正做意图理解的地方（包括术语消歧、mentionedPointType 提取、空指令追问）。识别出点位类型后向用户确认方案；key/name/description 等字段在 P3 交互补全，不做默认值推导。
 
 **MCP 缓存协议（防 context 爆炸）**：返回后立即 Write 到 `.lpm-cache/mcp/<slug>.md`；回复只给路径 + ≤100 字摘要，禁止原文回流；同一查询先 Read 缓存，7 天以上视为过期重拉。CLI 在 create/init 时自动把 `.lpm-cache/` 写入 `.gitignore`，并在 `local-config set` / `update` / `publish` 成功后按子目录清理，AI 只负责写入、不负责清理。
 
