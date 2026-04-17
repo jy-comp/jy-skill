@@ -8,21 +8,21 @@
 >
 > **三个 API 的职责分工（dataSource 场景下）**：
 >
-> | API | 返回内容 | 用途 |
+> | API | 签名 | 作用 |
 > |---|---|---|
-> | `getProps()` | **静态配置元信息**（dataSource 值是订阅配置 = "指向哪个上游"） | 一次性读组件配置；快照、不响应式 |
-> | `watch(cb, propKey 或 [propKey...])` | 回调 `newProps[dataSourceKey]` **直接是工作项数据**（响应式，上游变化时自动触发） | 订阅数据源变化，UI 实时刷新 |
-> | `getDataSourceResult(propKey, {pageNum, pageSize})` | 当前快照的工作项列表 | mount 初始化、翻页、用户主动 refresh 等场景 |
+> | `getProps()` | 读取当前组件的入参（props 对象） | 一次性读 props 快照；dataSource 类型的 prop 值是订阅配置，不是工作项数据 |
+> | `watch(callback, watchKeys)` | 监听 `getProps` 返回的 props 对象值变化 | 回调入参是变化后的 props 对象（同 `getProps` 结构）；**用作变更触发时机**，不携带数据源数据 |
+> | `getDataSourceResult(propKey, pagination)` | 获取数据源类型实例属性值 | **唯一的数据源读取入口**：mount 首屏、watch 回调内重刷、翻页、用户主动 refresh |
 >
 > **关键差异**：
-> - **拿配置元信息 → `getProps`**（静态）
-> - **拿数据（响应式）→ `watch`**（回调直接给数据，**不需要再调 `getDataSourceResult`**）
-> - **拿数据（主动）→ `getDataSourceResult`**（mount 初始化 / 翻页 / 筛选）
+> - **拿 props / 配置元信息 → `getProps`**（静态快照）
+> - **响应 props 变化 → `watch`**（回调给变化后的 props 对象，**不给数据源数据**；当触发时机用）
+> - **拿数据源数据 → `getDataSourceResult`**（唯一入口；mount 初始化 / watch 回调内重刷 / 翻页）
 >
 > **常见误用**：
-> - 用 `getProps()` 想读工作项列表 → 拿到的是订阅配置元信息，不是数据
-> - watch 回调里再调 `getDataSourceResult` → 多余的网络往返，watch 已经给了数据
-> - 用 `getDataSourceResult` 当响应式刷新 → 拿不到自动更新，必须配 watch
+> - 用 `getProps()` 想读工作项列表 → 拿到的是 dataSource 的订阅配置，不是数据
+> - 以为 watch 回调直接给工作项数据 → 回调只给 props 对象（同 `getProps` 结构），数据仍需在回调内调 `getDataSourceResult` 拉取
+> - 用 `getDataSourceResult` 当响应式刷新 → 它只是一次性读取，需配 `watch` 当触发时机才能随上游变化刷新
 
 ## 1. 定义数据源属性
 组件需要一个 `dataSource` 类型的 property（`propKey` 自定）。管理员搭建时把它绑定到上游组件 `notify` 的 dataSet 输出（= 订阅）。
@@ -155,35 +155,41 @@ data.forEach(item => {
 
 ## 5. 订阅数据源更新（响应式刷新）
 
-只在 mount 时调一次 `getDataSourceResult` → 上游数据变化（管理员改筛选、上游推新 moql、绑定切换等）后组件不会自动刷新。配 `watch` 才能响应式更新——**watch 回调直接给工作项数据，不需要再调 `getDataSourceResult`**。
+只在 mount 时调一次 `getDataSourceResult` → 上游数据/配置变化（管理员改筛选、改绑定、调整消费字段等）后组件不会自动刷新。配 `watch` 作为**变更触发时机**——
+
+> ⚠️ **watch 回调不给数据源数据**：`watch` 只监听组件属性（props）层面的变化，回调入参 `newProps` 结构**同 `getProps`**，是配置元信息快照。dataSource 类型的属性变化时，回调里 `newProps[dataSourceKey]` 依然是订阅配置元信息（指向哪个上游），**不是工作项数据**。
+>
+> 工作项数据的唯一来源永远是 `getDataSourceResult`。把 `watch` 当成"上游有变化，该重新取数了"的触发信号，在回调里重新调 `getDataSourceResult` 才能拿到新数据。
 
 ```ts
-// 订阅 dataSource propKey 的变化（响应式）
+// watch 作为触发时机：回调触发 → 在回调内重新调 getDataSourceResult 拉新数据
 const off = await window.JSSDK.liteAppComponent.watch(
-  (newProps) => {
-    // newProps[dataSourceKey] 直接是最新工作项数据，不是配置元信息
-    const next = newProps['items'];
-    // next 的形态由 getDataSourceResult 同款契约决定（{ data, total, hasMore }）
-    setItems(next.data);
+  async (newProps) => {
+    // newProps 结构同 getProps，是配置元信息快照，不含数据源数据
+    // 回调本身的价值是"时机"：告诉你上游配置/订阅有变化，该重新取数了
+    const { data } = await window.JSSDK.liteAppComponent.getDataSourceResult(
+      'items',
+      { pageNum: 1, pageSize: 50 },
+    );
+    setItems(data);
   },
-  'items',   // dataSource propKey；也支持 ['items'] / 多 key 形式 ['items', 'titleKey']
+  'items',   // dataSource propKey；也支持数组形式 ['items', 'titleKey']
 );
 
 off?.();   // 卸载时取消订阅（React useEffect cleanup）
 ```
 
 **要点**：
+- **watch 回调 = 时机，不是数据**：数据永远从 `getDataSourceResult` 拿，mount 初始化、watch 回调、翻页都走这一条路
 - `watch` 第二参数支持**单个 propKey string** 或 **propKey 数组**两种形态
-- 回调 `newProps[dataSourceKey]` **直接是工作项数据**（不是配置元信息）；元信息（指向哪个上游）只能通过 `getProps()` 拿，且是静态的
-- 回调入参类型按 propType 不同而不同：普通属性是配置值（string / number / array...），dataSource 是工作项数据
-- 防抖：上游频繁推送时回调会高频触发，必要时加节流
+- 防抖：上游频繁推送时回调会高频触发，必要时在回调内加节流再调 `getDataSourceResult`
 - 卸载时一定调 `off()`，否则会内存泄漏 + 重复刷新
 
 **典型生命周期**：
 1. **mount** → `getDataSourceResult(propKey, { pageNum: 1 })` 主动拉首屏
-2. **mount** → `watch(cb, propKey)` 注册响应式订阅
-3. **数据变化** → watch 回调自动触发，回调入参直接是新数据
-4. **翻页 / 用户主动 refresh** → 再调 `getDataSourceResult`
+2. **mount** → `watch(cb, propKey)` 注册变更触发订阅
+3. **上游变化** → watch 回调触发 → **在回调内再调 `getDataSourceResult`** 拉新数据
+4. **翻页 / 用户主动 refresh** → 直接调 `getDataSourceResult`
 5. **unmount** → `off()` 取消订阅
 
 ### 交付兜底（让用户人工确认字段在工作项类型里真实存在）
