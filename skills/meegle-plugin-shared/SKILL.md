@@ -38,11 +38,21 @@ metadata:
 - 删除点位前置检查协议（本文件 · "删除点位前置检查协议"小节）
 - 各 skill 落地：feature/references/config-apply.md A0、config-plan.md "删除操作"
 
-### 根原则 3：不可逆动作显式确认
-**核心**：任何对外部生效、不可撤回的动作（发布、删除、覆盖远端等），必须等用户显式同意才执行。
+### 根原则 3：真实数据动作显式确认
+**核心**：任何会对远端产生真实影响的动作——不管能不能撤回——执行前必须向用户列出"将要做什么 + 影响哪些数据"，等用户显式同意才执行。可撤回不代表可擅自推进，先确认能防止远端被改成不期望的状态。
+
+**四类必须先确认的动作**：
+1. **创建插件**（在 Meegle 后台生成插件记录，pluginId 从此绑定）
+2. **配置点位**（`local-config set` 等，把 plugin.config.json 全量推到后台）
+3. **配置基本信息**（更新插件名称 / 简短描述 / 详细描述 / 分类等元信息）
+4. **发布插件**（`publish`，发到 Meegle 市场，用户可见，最不可逆）
+
 **派生应用**：
+- 创建插件（meegle-plugin-create）
+- local-config set 推送点位变更（meegle-plugin-feature/references/config-apply.md）
+- 删除点位前置检查协议（本文件下方独立小节）
+- 更新插件基本信息（meegle-plugin-polish）
 - publish 发布到市场（meegle-plugin-publish/references/pre-check.md）
-- 删除点位（同根原则 2 的派生，互相穿插）
 
 > **AI 阅读顺序**：见到任意 CRITICAL 标记，先识别它属于哪条根原则；如果识别不出，按"无源即停"默认处理（最保守动作 = 停下问用户）。
 
@@ -104,7 +114,7 @@ Token 按域名生效，确定 `siteDomain` 的优先级：
 - **`.lpm/` 目录由 CLI 内部管理**（`auth.json`、缓存等），不要用 Edit/Write 直接改，只能通过 CLI 命令间接操作。此限制仅限 `.lpm/` 目录内部。
 - **`plugin.config.json` 由 CLI 维护**：点位信息通过 `local-config set` + `update --source-type=remote` 同步，`resources` 数组里的 `id` / `entry` 由 `update` 生成。不要用 Edit/Write 直接改这个文件——手工改 CLI 下次 update 会对不上。其他 skill 需要点位信息时读它、不写它。
 - **禁止输出密钥**（accessToken、pluginSecret）到终端明文
-- **写入/删除操作前必须确认用户意图**（如发布、删除点位等不可逆操作）
+- **真实数据动作前必须显式确认**（创建插件 / 配置点位 / 配置基本信息 / 发布 —— 见根原则 3）
 - **全量提交约束**：见下方独立小节
 
 ### 全量提交约束（CRITICAL — 防数据丢失，本规则唯一权威源）
