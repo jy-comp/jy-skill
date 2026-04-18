@@ -24,6 +24,16 @@ metadata:
 - URL 详细策略 → 仅在涉及 URL 字段填写时 Read [`../meegle-plugin-shared/references/url-policy.md`](../meegle-plugin-shared/references/url-policy.md)
 - **不要预加载 8 个子步骤 reference + 4 个 point-type doc**；只读当前 step 和当前点位类型对应的那 1-2 份
 
+### 按场景细化最小读取（识别意图后再决定读哪些）
+
+| 场景 | 必读 | 不读 |
+|---|---|---|
+| **stage=config**（只改点位声明） | `config-{setup,plan,apply,verify}.md` 按当前子步 | 不读任何 `code-*.md` |
+| **stage=code**（只改代码，点位配置已在远端） | `code-{setup,plan,apply,verify}.md` 按当前子步 + 点位 doc 按 index 命中 | 不读任何 `config-*.md`；点位配置直接从 `point.config.local.json` 用 jq 切片 |
+| **端到端** | Stage Config 子步按需 → 进 Stage Code 时才读 `code-*` 和点位 doc | — |
+| **liteAppComponent 相关任务** | 进 Stage Code 时加读 `point-types/liteAppComponent/index.md`，按维度判定再 Read `read-props.md` 或 `write-outputs.md` | 其他维度对应的 doc |
+| **其他点位类型** | 无专属 doc，走 `code-plan.md` Step 4 兜底 | `point-types/` 目录整体跳过 |
+
 ## 前置守卫（入口必须先检查）
 
 执行任何后续步骤前，先验证当前工作目录是否为 Meegle 插件工程：
